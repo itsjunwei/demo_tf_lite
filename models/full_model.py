@@ -8,7 +8,7 @@ from loss_and_metrics import *
 
 
 """
-Split into 2 main sections
+Split into sections
 
 1. Encoding functions 
     - Conv blocks
@@ -18,6 +18,13 @@ Split into 2 main sections
     - utility functions 
     - decoder modules (BiGRU)
     - fully connected layers for SED and DOA
+
+3. Model Setup 
+    - setup model flow and configurations
+    - return the model
+
+4. Training/Inference 
+    - to do
 
     
 Main Code
@@ -34,6 +41,7 @@ Training
 - Input/Ground Truths
 - SELD Metrics
 - Optimizations / Momentum / Learning Rate etc. 
+- Implement training (start off with DCASE 2021 data)
 """
 
 
@@ -267,13 +275,13 @@ def bigru_unit(x):
     """
     Implementation of the BiGRU decoder
 
-    This one need to double check as unsure of how to merge the bigru decoders
+    Unsure if there is a need for TimeDistributed(Dense(512)) to further refine the BiGRU output
     """
     
     # To do : check how to merge the final bigru
     bigru1 = Bidirectional(GRU(units=256, dropout=0.3, return_sequences=True, name="GRU1"), name="BiGRU1")(x)
     bigru2 = Bidirectional(GRU(units=256, dropout=0.3, return_sequences=True, name="GRU2"), name="BiGRU2")(bigru1)
-    bigru2 = TimeDistributed(Dense(512))(bigru2)
+    # bigru2 = TimeDistributed(Dense(512))(bigru2)
     
     return bigru2
 
@@ -397,7 +405,7 @@ if __name__ == "__main__":
         ]
         converter.target_spec._experimental_enable_select_tf_ops = True
         tflite_model = converter.convert()
-        filename = "./saved_models/model_{}_selectops.tflite".format(resnet_style)
+        filename = "./saved_models/model_{}_selectops_notimedist.tflite".format(resnet_style)
         with open(filename, 'wb') as f:
             f.write(tflite_model)
 
