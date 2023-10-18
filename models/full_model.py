@@ -36,6 +36,7 @@ To-do
 
 Implement ResNet optimizations
 - Combination of both
+- Is it possible to combine all the layers into one model class for readability (?)
 
 Training
 - Input/Ground Truths
@@ -257,6 +258,9 @@ def micro_dsc_block(x, out_channels, stride):
     return x
 
 def frequency_pooling(x, pooling_type='avg'):
+    """
+    Implementation of the frequency pooling layer 
+    """
     # x = (batchsize, channels, timebins, freqbins)
 
     # The frequency axis is the last one
