@@ -23,7 +23,10 @@ Split into sections
     - setup model flow and configurations
     - return the model
 
-4. Training/Inference 
+4. Training/Checkpointing 
+    - to do
+
+5. Inference
     - to do
 
     
@@ -35,12 +38,12 @@ To-do
 -----
 
 Implement ResNet optimizations
-- Combination of both
+- Combination of both DSC and BTN
 - Is it possible to combine all the layers into one model class for readability (?)
 
 Training
 - Input/Ground Truths (data generator)
-- SELD Metrics (deicde how to implement for demo)
+- SELD Metrics (decide how to implement for demo)
 - Optimizations / Momentum / Learning Rate etc. 
 - Implement training (start off with DCASE 2021 data)
 """
@@ -48,8 +51,16 @@ Training
 
 def conv_block(x, out_channels):
     """
-    Basic Convolution Block that is used in the start of the model, right
-    after the input  
+    Basic Convolution Block that is used in the start of the model
+
+    Inputs
+    ------
+    x               : (np.array) input data
+    out_channels    : (int) number of output channels
+
+    Returns
+    -------
+    x               : (np.array) feature maps of (output channels x _ x _) shape 
     """
 
     # 2 Convolution subblocks, so we do this process twice
@@ -67,7 +78,8 @@ def conv_block(x, out_channels):
         x = ReLU()(x)
 
     # Default Keras AveragePooling2D parameters will do
-    x = AveragePooling2D(data_format='channels_first')(x)
+    x = AveragePooling2D(data_format='channels_first',
+                         name = "avg_pool_init")(x)
     
     return x
 
@@ -83,7 +95,21 @@ def resnet_block(x, out_channels, stride, resnet_style='basic'):
                     |   Micro   |   Conv 3x3 (n filters, 1 stride)
                     |           |   Conv 3x3 (n filters, 1 stride)
                     |           |   Add skip connection 
+
+    Input
+    -----
+    x               : (np.array) input data
+    out_channels    : (int) number of output channels of the block
+    stride          : (int) for SALSA, only the first micro conv has a stride of s
+    resnet_style    : (str) one of 'basic' , 'bottleneck' or 'dsc' corresponding to
+                            base (normal) , bottleneck or depthwise-seperable 
+                            convolutions that all micro-blocks will use
+
+    Returns
+    -------
+    x               : (np.array) output data
     """
+
     # Only basic , bottleneck , depthwise-separable conv implemented
     assert resnet_style in ['basic', 'bottleneck', 'dsc'], "{} not implemented".format(resnet_style)
 
@@ -102,18 +128,26 @@ def resnet_block(x, out_channels, stride, resnet_style='basic'):
 
 def micro_resnet_block(x, out_channels, stride):
     """
-    x               : input data
-    out_channels    : the number of filters/channels
+    Standard micro resnet block architecture 
+        x -> conv -> conv -> adder -> y
+        |                      |
+        -->-skip connection-->--
+
+    Input
+    -----
+    x               : (np.array) input data
+    out_channels    : (int) number of output channels of the block
     stride          : (s) in this case it is either 1 or 2
 
-    Micro architecture 
-    - Conv 3x3
-    - Conv 3x3
-    - Skip Connection
+    Returns
+    ------
+    x               : output data
+    
     """
 
     identity = x
 
+    # Stride = 2 actually does an average pooling on x
     if stride == 2:
         x = AveragePooling2D(data_format='channels_first')(x)
 
@@ -152,9 +186,20 @@ def micro_resnet_block(x, out_channels, stride):
 
 def micro_bottleneck_block(x, out_channels, stride, downsample_factor = 4):
     """
-    Bottleneck blocks works by downsizing the input by factor d
-    Doing standard conv. functions on the downsized input
-    Upsizing the feature space by factor d (or d') to intended out_channels size
+    Bottleneck blocks works by downsizing the input by factor d, followed by applying
+    standard convolution filters on the downsized input. Finally, it will upsample the
+    resulting feature maps to a higher number of channels (original or not).
+    
+    Input
+    -----
+    x                   : (np.array) input data
+    out_channels        : (int) number of output channels of the block
+    stride              : (int) in this case, the value `s` is either 1 or 2
+    downsample_factor   : (int) the factor at which the inputs will be downsized
+
+    Returns
+    ------
+    x                   : (np.array) output data
     """
     
     identity = x
@@ -211,9 +256,18 @@ def micro_bottleneck_block(x, out_channels, stride, downsample_factor = 4):
 
 def micro_dsc_block(x, out_channels, stride):
     """
-    Similar to normal convolution block, but each 3x3 convolution is replaced by
+    Similar to the micro_resnet_block, but we replace each 3x3 convolution
+    filter with a depthwise convolution, followed by a pointwise convolution
+    
+    Input
+    -----
+    x               : (np.array) input data
+    out_channels    : (int) number of output channels of the block
+    stride          : (int) in this case, `s` is either 1 or 2
 
-    Depthwise -- Pointwise conv
+    Returns
+    ------
+    x               : (np.array) output data
     """
 
     identity = x
@@ -259,7 +313,17 @@ def micro_dsc_block(x, out_channels, stride):
 
 def frequency_pooling(x, pooling_type='avg'):
     """
-    Implementation of the frequency pooling layer 
+    Implementation of the frequency pooling layer
+
+    Input
+    -----
+    x               : (np.array) input data
+    pooling_type    : (str) how we wish to pool the frequency bins, one of 
+                            `avg`, `max` or `avg_max`
+
+    Returns
+    ------
+    x               : (np.array) output data 
     """
     # x = (batchsize, channels, timebins, freqbins)
 
@@ -272,26 +336,51 @@ def frequency_pooling(x, pooling_type='avg'):
         x1 = backend.mean(x, axis=-1)
         x2 = backend.max(x, axis=-1)
         x = x1 + x2
+
     return x
 
-def bigru_unit(x):
+def bigru_unit(x, add_dense=False):
 
     """
     Implementation of the BiGRU decoder
 
-    Unsure if there is a need for TimeDistributed(Dense(512)) to further refine the BiGRU output
+    Unsure if there is a need for `TimeDistributed(Dense(512))` to further 
+    refine the BiGRU output
+    
+    Input
+    -----
+    x           : (np.array) input data
+    add_dense   : (boolean) True if adding the `TimeDistributed Dense` layer,
+                            False otherwise
+
+    Returns
+    -------
+    x           : (np.array) output data
+
     """
     
     # To do : check how to merge the final bigru
     bigru1 = Bidirectional(GRU(units=256, dropout=0.3, return_sequences=True, name="GRU1"), name="BiGRU1")(x)
     bigru2 = Bidirectional(GRU(units=256, dropout=0.3, return_sequences=True, name="GRU2"), name="BiGRU2")(bigru1)
-    # bigru2 = TimeDistributed(Dense(512))(bigru2)
+
+    # Unsure about the cost/benefits of adding this layer
+    if add_dense : bigru2 = TimeDistributed(Dense(512))(bigru2)
     
     return bigru2
 
 def sed_fcn(x, n_classes=12):
     """
-    Fully connected layer for SED (multi-label, multi-class classification), without sigmoid
+    Fully connected layer for SED (multi-label, multi-class classification)
+
+    Inputs
+    ------
+    x           : (np.array) input data
+    n_classes   : (int) number of possible event classes
+
+    Returns
+    -------
+
+    x           : (np.array) output data of shape (batch_size, time_steps, n_classes)
     """
     
     # default values will do
@@ -307,6 +396,16 @@ def sed_fcn(x, n_classes=12):
 def doa_fcn(input, n_classes=12):
     """
     Fully connected layer for DOA (regression)
+
+    Inputs
+    ------
+    x           : (np.array) input data
+    n_classes   : (int) number of possible event classes
+
+    Returns
+    -------
+
+    doa_output  : (np.array) output data of shape (batch_size, time_steps, 3 * n_classes)
     """
 
     # X-Direction
@@ -338,11 +437,26 @@ def get_model(input_shape, resnet_style='basic', n_classes=12):
 
     The model should flow as:
 
+    ResNet Layers
+    -------------
     2 x (3x3) convolution blocks
     4 x ResNet macro blocks (64,128,256,512 channels)
     2 x BiGRU units
+    
+    2 Branches (SED, DOA)
+    ----------
     1 x FCN + Sigmoid for SED
     3 x FCN + tanh for (x,y,z) DOA
+
+    Inputs
+    ------
+    input_shape     : (tuple) the shape of the input features
+    resnet_style    : (str) the type of ResNet to be used in the model
+    n_classes       : (int) number of possible event classes 
+
+    Returns
+    -------
+    model           : (model) Keras model
     """
     
     # Create input of salsa-lite features (remove batch_size=1 during training)
@@ -400,7 +514,7 @@ if __name__ == "__main__":
     salsa_lite_model.summary(show_trainable=True)
 
     # To convert and save the model into tflite version 
-    convert = True
+    convert = False
     if convert: 
         converter = tf.lite.TFLiteConverter.from_keras_model(salsa_lite_model)
         converter.target_spec.supported_ops = [
