@@ -67,6 +67,7 @@ def write_classwise_output(pred_dict, filename):
     z = doa_frame_output[:, 2 * n_classes:]
 
     # convert to polar rad -> polar degree
+    # elevation can ignore for now (dataset has no elevation)
     azi_frame_output = np.around(np.arctan2(y, x) * 180.0 / np.pi)
     ele_frame_output = np.around(np.arctan2(z, np.sqrt(x ** 2 + y ** 2)) * 180.0 / np.pi)
 

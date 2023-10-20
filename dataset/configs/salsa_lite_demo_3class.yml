@@ -1,4 +1,4 @@
-# Config to extract SALSA-Lite or SALSA-IPD feature for TAU-NIGENS Spatial Sound Events (TNSSE) 2021 dataset
+# Config to extract SALSA-Lite for demo with 3 classes
 data_dir: './data'
 feature_dir: './features'
 data:

@@ -39,8 +39,8 @@ Implement ResNet optimizations
 - Is it possible to combine all the layers into one model class for readability (?)
 
 Training
-- Input/Ground Truths
-- SELD Metrics
+- Input/Ground Truths (data generator)
+- SELD Metrics (deicde how to implement for demo)
 - Optimizations / Momentum / Learning Rate etc. 
 - Implement training (start off with DCASE 2021 data)
 """

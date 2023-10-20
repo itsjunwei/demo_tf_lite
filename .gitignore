@@ -8,3 +8,5 @@ __pycache__/
 data/
 features/
 outputs/
+dataset/data
+dataset/meta
