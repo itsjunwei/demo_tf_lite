@@ -2,9 +2,10 @@ from keras.layers import Input, Conv2D, BatchNormalization, Activation
 from keras.layers import DepthwiseConv2D, AveragePooling2D, Dropout, GRU, Bidirectional, TimeDistributed, Concatenate
 from keras.layers import Add, ReLU, Dense
 from keras import backend, Model
-from keras import optimizers
+from keras.metrics import MeanAbsoluteError
 import tensorflow as tf
 from loss_and_metrics import *
+from model_utils import * 
 
 
 """
@@ -488,14 +489,17 @@ def get_model(input_shape, resnet_style='basic', n_classes=12):
                   name='SALSA_model_test')
     
     # To do : figure out how to configure optimizers
-    opt = tf.keras.optimizers.Adam(learning_rate=0.3)
+    opt = tf.keras.optimizers.Adam(learning_rate=custom_scheduler)
 
     # To do : custom metrics, loss 
-    model.compile(optimizer=opt, 
-                  loss={'event_frame_output' : 'binary_crossentropy', 
-                        'doa_frame_output' : compute_doa_reg_loss}, 
-                  loss_weights = {'event_frame_output' : 0.3,
-                                  'doa_frame_output' : 0.7})
+    # placeholder metrics until can settle DCASE SELD metrics
+    model.compile(optimizer     = opt, 
+                  loss          = {'event_frame_output' : 'binary_crossentropy',
+                                   'doa_frame_output' : compute_doa_reg_loss}, 
+                  loss_weights  = {'event_frame_output' : 0.3,
+                                   'doa_frame_output' : 0.7},
+                  metrics       = {'event_frame_output' : 'accuracy',
+                                   'doa_frame_output' : MeanAbsoluteError()})
 
     return model
 

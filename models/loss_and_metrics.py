@@ -12,7 +12,39 @@ SELD Metrics --> DCASE metrics (need to figure out how to implement)
 import keras.backend as K
 import numpy as np
 import tensorflow as tf
+from keras.losses import binary_crossentropy 
 import pandas as pd
+
+def weighted_loss(target_dict, pred_dict, n_classes=12, loss_weights=[0.3, 0.7]):
+
+    """
+    Use this function in the case when the output is in a single dictionary of 
+    pred_dict = {
+        'event_frame_logit': event_frame_logit,
+        'doa_frame_output': doa_output,
+    }
+
+    Accordingly, the ground truth has also to be the same dictionary of 
+    target_dict = {
+        'event_frame_gt' : event_frame_gt,
+        'doa_frame_gt' : doa_frame_gt
+    }
+    """
+
+    sed_weight = loss_weights[0]
+    doa_weight = loss_weights[1]
+
+    event_frame_logit = pred_dict['event_frame_logit']
+    event_frame_gt = target_dict['event_frame_gt']
+    doa_frame_output = pred_dict['doa_frame_output']
+    doa_frame_gt = target_dict['doa_frame_gt']
+
+    doa_loss = compute_doa_reg_loss(doa_frame_gt, doa_frame_output, n_classes)
+    sed_loss = binary_crossentropy(event_frame_gt, event_frame_logit)
+
+    total_loss = sed_weight*sed_loss + doa_weight*doa_loss
+
+    return total_loss
 
 def interpolate_tensor(tensor, ratio: float = 1.0):
     """
