@@ -3,7 +3,7 @@ data_dir: './data'
 feature_dir: './features'
 data:
   format: 'mic'
-  fs: 24000
+  fs: 48000
   n_fft: 512
   win_len: 512
   hop_len: 300  # 300 for 12.5ms for n_fft = 512; 150 for n_fft = 256
