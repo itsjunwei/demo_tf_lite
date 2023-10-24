@@ -61,7 +61,7 @@ def extract_features(audio_dir,
     fmax_doa = cfg['data']['fmax_doa']
     
     """
-    For SALSA-Lite, fmax_doa = 2kHz, fs = 24kHz, n_fft = 512
+    For SALSA-Lite, fmax_doa = 2kHz, fs = 48kHz, n_fft = 1024
     This results in the following:
         n_bins      = 257
         lower_bin   = 1
@@ -86,8 +86,12 @@ def extract_features(audio_dir,
     freq_vector[0] = 1
     freq_vector = freq_vector[:, None, None]  # n_bins x 1 x 1
 
-    # Extract features
+    # Checking parameters
+    print("lower_bin    : ", lower_bin)
+    print("upper_bin    : ", upper_bin)
+    print("cutoff_bin   : ", cutoff_bin)
     
+    # Extract features
     audio_fn_list = sorted(os.listdir(audio_dir))
     
     for count, file in enumerate(tqdm(audio_fn_list)):
@@ -129,7 +133,6 @@ def extract_features(audio_dir,
             feature_fn = os.path.join(feature_dir, file.replace('wav', 'h5'))
             with h5py.File(feature_fn, 'w') as hf:
                 hf.create_dataset('feature', data=audio_feature, dtype=np.float32)
-            if count % 100 == 0: tqdm.write('{}, {}, {}'.format(count, file, audio_feature.shape))
 
 def compute_scaler(feature_dir):
     
