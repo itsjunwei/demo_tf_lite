@@ -14,6 +14,46 @@ import numpy as np
 import tensorflow as tf
 from keras.losses import binary_crossentropy 
 import pandas as pd
+from keras.losses import Loss
+
+
+def weighted_seld_loss(y_true, y_pred):
+    """
+    Generate weighted SELD loss. Keras custom loss functions must only take (y_true, y_pred)
+    as parameters. 
+    
+    Number of classes (n_classes = 3) and weights (0.3 , 0.7) are hard-coded.
+    
+    The model output has a label rate of 5fps. For the demo, each input is 200ms, which will
+    result in one label per input. 
+
+    Args:
+        y_true : ground truth
+        y_pred : predictions
+
+    Returns:
+        seld_loss : weighted seld loss
+    """
+    # y_true : [[class], [azimuth]]
+    # y_pred : [[event_frame_pred], [doa_output]]
+    
+    n_classes = 3 # hardcoded
+    weights = [0.3, 0.7]
+    
+    sed_gt = y_true[0]
+    azi_gt = y_true[1]
+    event_frame_pred = y_pred[0]
+    doa_output = y_pred[1]
+    sed_loss = binary_crossentropy(sed_gt, event_frame_pred)
+    doa_loss = masked_reg_loss_azimuth(event_frame_gt=sed_gt,
+                                       doa_frame_gt=azi_gt, 
+                                       doa_frame_output=doa_output, 
+                                       n_classes=n_classes)
+    
+    seld_loss = weights[0] * sed_loss + weights[1] * doa_loss
+    
+    return seld_loss
+
 
 def weighted_loss(target_dict, pred_dict, n_classes=12, loss_weights=[0.3, 0.7]):
 
@@ -66,10 +106,6 @@ def interpolate_tensor(tensor, ratio: float = 1.0):
 
     return new_tensor
 
-def custom_metric(y_true, y_pred):
-
-    pass
-
 def write_classwise_output(pred_dict, filename):
     """
     :param pred_dict:
@@ -118,6 +154,15 @@ def write_classwise_output(pred_dict, filename):
     submission_df.to_csv(filename, index=False, header=False)
     pass
 
+def masked_reg_loss_azimuth(event_frame_gt, doa_frame_gt, doa_frame_output, n_classes):
+    x_loss = compute_masked_reg_loss(input=doa_frame_output[:, :, : n_classes],
+                                     target=doa_frame_gt[:, :, : n_classes],
+                                     mask=event_frame_gt)
+    y_loss = compute_masked_reg_loss(input=doa_frame_output[:, :, n_classes:2*n_classes],
+                                     target=doa_frame_gt[:, :, n_classes:2*n_classes],
+                                     mask=event_frame_gt)
+    azi_loss = x_loss + y_loss
+    return azi_loss
 
 def compute_doa_reg_loss(target_dict, pred_dict, n_classes):
     x_loss = compute_masked_reg_loss(input=pred_dict['doa_frame_output'][:, :, : n_classes],

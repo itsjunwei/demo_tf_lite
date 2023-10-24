@@ -6,6 +6,6 @@ data:
   fs: 48000 # re-recorded dataset is 48kHz
   n_fft: 1024 # increase fft point to mimic original salsa-lite input size
   win_len: 512 # unused
-  hop_len: 300  # 300 for 12.5ms for n_fft = 512; 150 for n_fft = 256
+  hop_len: 600  # since we doubled fft point size, we double hop size accordingly as well
   fmin_doa: 50  # Hz
   fmax_doa: 2000 # Hz

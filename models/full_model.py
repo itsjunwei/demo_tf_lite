@@ -4,7 +4,7 @@ from keras.layers import Add, ReLU, Dense
 from keras import backend, Model
 from keras.metrics import MeanAbsoluteError
 import tensorflow as tf
-from loss_and_metrics import *
+from loss_and_metrics import weighted_seld_loss
 from model_utils import * 
 
 
@@ -394,13 +394,14 @@ def sed_fcn(x, n_classes=12):
     # (batch_size, time_steps, n_classes)
     return x
 
-def doa_fcn(input, n_classes=12):
+def doa_fcn(input, azi_only=False, n_classes=12):
     """
     Fully connected layer for DOA (regression)
 
     Inputs
     ------
     x           : (np.array) input data
+    azi_only    : (boolean) True if only predicting Azimuth (X,Y) , False otherwise
     n_classes   : (int) number of possible event classes
 
     Returns
@@ -421,18 +422,24 @@ def doa_fcn(input, n_classes=12):
     y = Dropout(0.2)(y)
     y_out = Dense(n_classes, activation='tanh', name='y_output')(y)
 
-    # Z-Direction
-    z = Dropout(0.2)(input)
-    z = Dense(256, name='dense_z')(z)
-    z = Dropout(0.2)(z)
-    z_out = Dense(n_classes, activation='tanh', name='z_output')(z)
-
-    # (batch_size, time_steps, 3 * n_classes)
-    doa_output = Concatenate(name='doa_frame_output')([x_out, y_out, z_out])
+    # If Azimuth only, no need the fully connected layer for the Z-direction predictions
+    if not azi_only:
+        # Z-Direction
+        z = Dropout(0.2)(input)
+        z = Dense(256, name='dense_z')(z)
+        z = Dropout(0.2)(z)
+        z_out = Dense(n_classes, activation='tanh', name='z_output')(z)
+        
+    if azi_only:
+        # (batch_size, time_steps, 2 * n_classes)
+        doa_output = Concatenate(name="doa_frame_output")([x_out, y_out])
+    else:
+        # (batch_size, time_steps, 3 * n_classes)
+        doa_output = Concatenate(name='doa_frame_output')([x_out, y_out, z_out])
     
     return doa_output
 
-def get_model(input_shape, resnet_style='basic', n_classes=12):
+def get_model(input_shape, resnet_style='basic', n_classes=12, azi_only = False):
     """
     The entire SALSA-Lite model, using Keras functional API to design and flow
 
@@ -454,6 +461,7 @@ def get_model(input_shape, resnet_style='basic', n_classes=12):
     input_shape     : (tuple) the shape of the input features
     resnet_style    : (str) the type of ResNet to be used in the model
     n_classes       : (int) number of possible event classes 
+    azi_only        : (boolean) True if only predicting Azimuth (X,Y) , False otherwise
 
     Returns
     -------
@@ -479,13 +487,13 @@ def get_model(input_shape, resnet_style='basic', n_classes=12):
 
     # Create output
     event_frame_pred = sed_fcn(bigru_output, n_classes)
-    doa_output = doa_fcn(bigru_output,n_classes)
+    doa_output = doa_fcn(bigru_output, azi_only, n_classes)
 
 
     # Create model 
-    model = Model(inputs, 
-                  {'event_frame_output' : event_frame_pred, 
-                   'doa_frame_output' : doa_output}, 
+    model = Model(inputs,
+                  [event_frame_pred,
+                   doa_output], 
                   name='SALSA_model_test')
     
     # To do : figure out how to configure optimizers
@@ -494,12 +502,8 @@ def get_model(input_shape, resnet_style='basic', n_classes=12):
     # To do : custom metrics, loss 
     # placeholder metrics until can settle DCASE SELD metrics
     model.compile(optimizer     = opt, 
-                  loss          = {'event_frame_output' : 'binary_crossentropy',
-                                   'doa_frame_output' : compute_doa_reg_loss}, 
-                  loss_weights  = {'event_frame_output' : 0.3,
-                                   'doa_frame_output' : 0.7},
-                  metrics       = {'event_frame_output' : 'accuracy',
-                                   'doa_frame_output' : MeanAbsoluteError()})
+                  loss          = weighted_seld_loss,
+                  metrics       = ['accuracy' , MeanAbsoluteError()])
 
     return model
 
@@ -507,12 +511,13 @@ def get_model(input_shape, resnet_style='basic', n_classes=12):
 if __name__ == "__main__":
 
     # Simulate one full minute input for testing
-    input_size = (7, 4801, 191)
+    input_size = (7, 17, 191)
 
     # Generate input, output pointers
     # use one of basic , bottleneck , dsc for resnet_style
     resnet_style = 'basic'
-    n_classes = 12
+    n_classes = 3
+    azi_only = True
     salsa_lite_model = get_model(input_size, resnet_style, n_classes)
 
     salsa_lite_model.summary(show_trainable=True)
