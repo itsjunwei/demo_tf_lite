@@ -47,6 +47,7 @@ Training
 - SELD Metrics (decide how to implement for demo)
 - Optimizations / Momentum / Learning Rate etc. 
 - Implement training (start off with DCASE 2021 data)
+- Convert to dictionary for output (appears to work better)
 """
 
 
@@ -468,8 +469,8 @@ def get_model(input_shape, resnet_style='basic', n_classes=12, azi_only = False)
     model           : (model) Keras model
     """
     
-    # Create input of salsa-lite features (remove batch_size=1 during training)
-    inputs = Input(shape=input_shape, batch_size=1,name = "salsa-lite_features", sparse=False)
+    # Create input of salsa-lite features
+    inputs = Input(shape=input_shape, name = "salsa-lite_features", sparse=False)
     
     # Initial 2 x conv blocks for input
     input = conv_block(inputs, 64)
@@ -492,12 +493,11 @@ def get_model(input_shape, resnet_style='basic', n_classes=12, azi_only = False)
 
     # Create model 
     model = Model(inputs=inputs,
-                  outputs=[event_frame_pred,
-                   doa_output], 
+                  outputs=[event_frame_pred, doa_output], 
                   name='SALSA_model_test')
     
     # To do : figure out how to configure optimizers
-    opt = tf.keras.optimizers.Adam(learning_rate=custom_scheduler)
+    opt = tf.keras.optimizers.Adam()
 
     # To do : custom metrics, loss 
     # placeholder metrics until can settle DCASE SELD metrics
@@ -519,7 +519,7 @@ if __name__ == "__main__":
     resnet_style = 'basic'
     n_classes = 3
     azi_only = True
-    salsa_lite_model = get_model(input_size, resnet_style, n_classes)
+    salsa_lite_model = get_model(input_size, resnet_style, n_classes, azi_only)
 
     salsa_lite_model.summary(show_trainable=True)
 

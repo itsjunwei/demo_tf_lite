@@ -18,12 +18,6 @@ dname = os.path.dirname(abspath)
 print("Changing directory to : ", dname)
 os.chdir(dname)
 
-# Import relative path modules 
-sys.path.append('../')
-import dataset 
-
-
-
 # Global model settings
 resnet_style = 'basic'
 n_classes = 3
@@ -44,17 +38,18 @@ input_shape = feature_dataset[0].shape
 # Get the salsa-lite model
 salsa_lite_model = get_model(input_shape=input_shape, 
                              resnet_style=resnet_style, 
-                             n_classes=n_classes)
+                             n_classes=n_classes,
+                             azi_only=True)
 # salsa_lite_model.summary()
 
 # Model Training Configurations
 checkpoint = ModelCheckpoint("../experiments/salsalite_demo_{epoch:03d}_loss_{loss:.4f}.h5",
-                             monitor="loss",
+                             monitor="val_loss",
                              verbose=1,
                              save_weights_only=False,
                              save_best_only=True)
 
-early = EarlyStopping(monitor="loss",
+early = EarlyStopping(monitor="val_loss",
                       mode="min",
                       patience=10)
 
@@ -71,7 +66,7 @@ schedule = LearningRateScheduler(scheduler)
 csv_logger = CSVLogger(filename = '../experiments/training_demo.csv', append=False)
 tensorboard_callback = TensorBoard(log_dir='../experiments/logs', histogram_freq=1)
 
-callbacks_list = [checkpoint, early, tensorboard_callback, csv_logger]
+callbacks_list = [checkpoint, early, tensorboard_callback, csv_logger, schedule]
 
 # Split the dataset into train (60%) , validation (20%) , test (20%)
 x_train , x_test , cls_train , cls_test, doa_train, doa_test  = train_test_split(feature_dataset, 
@@ -93,18 +88,16 @@ print("test split size       : {}".format(len(x_test)))
 # Checking if GPU is being used
 print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
 
-# Checking model input, outputs
-print("inputs")
-
-
+# Train model
 demo_model_hist = salsa_lite_model.fit(x_train,
                                        [cls_train, doa_train],
-                                       batch_size=10,
-                                       epochs=2,
+                                       batch_size=100,
+                                       epochs=50,
                                        initial_epoch=0,
-                                       verbose=2,
+                                       verbose=1,
                                        validation_data=(x_val, [cls_val, doa_val]),
                                        callbacks = callbacks_list,
                                        shuffle=True)
 
-salsa_lite_model.save_weights('../experiments/demo_model_hist.npy', salsa_lite_model.history, allow_pickle=True)
+salsa_lite_model.save_weights('../experiments/model_last.h5')
+np.save('../experiments/demo_model_hist.npy', salsa_lite_model.history, allow_pickle=True)

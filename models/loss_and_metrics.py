@@ -18,13 +18,10 @@ from keras.losses import Loss, MeanAbsoluteError
 
 def compute_azimuth_regression_loss(y_true, y_pred):
     
-    # azi_gt = (batch_size ,n_time_steps, azimuth)
-    
-    x_gt = np.cos(y_true)
-    y_gt = np.sin(y_true)
-    xy_gt = np.concatenate((x_gt, y_gt), axis=-1)
+    mask = tf.cast(tf.not_equal(y_true, 0), tf.float32)
+    masked_y_pred = mask*y_pred
     loss_object = MeanAbsoluteError()
-    doa_loss = loss_object(xy_gt, y_pred)
+    doa_loss = loss_object(y_true, masked_y_pred)
     
     return doa_loss
     
