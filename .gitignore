@@ -14,3 +14,4 @@ dataset/cleaned_data
 testing/
 offline/
 dataset/demo_dataset
+logs/

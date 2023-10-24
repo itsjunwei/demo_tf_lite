@@ -14,9 +14,20 @@ import numpy as np
 import tensorflow as tf
 from keras.losses import binary_crossentropy 
 import pandas as pd
-from keras.losses import Loss
+from keras.losses import Loss, MeanAbsoluteError
 
-
+def compute_azimuth_regression_loss(y_true, y_pred):
+    
+    # azi_gt = (batch_size ,n_time_steps, azimuth)
+    
+    x_gt = np.cos(y_true)
+    y_gt = np.sin(y_true)
+    xy_gt = np.concatenate((x_gt, y_gt), axis=-1)
+    loss_object = MeanAbsoluteError()
+    doa_loss = loss_object(xy_gt, y_pred)
+    
+    return doa_loss
+    
 def weighted_seld_loss(y_true, y_pred):
     """
     Generate weighted SELD loss. Keras custom loss functions must only take (y_true, y_pred)

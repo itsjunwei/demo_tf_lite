@@ -4,7 +4,7 @@ from keras.layers import Add, ReLU, Dense
 from keras import backend, Model
 from keras.metrics import MeanAbsoluteError
 import tensorflow as tf
-from loss_and_metrics import weighted_seld_loss
+from loss_and_metrics import compute_azimuth_regression_loss
 from model_utils import * 
 
 
@@ -491,8 +491,8 @@ def get_model(input_shape, resnet_style='basic', n_classes=12, azi_only = False)
 
 
     # Create model 
-    model = Model(inputs,
-                  [event_frame_pred,
+    model = Model(inputs=inputs,
+                  outputs=[event_frame_pred,
                    doa_output], 
                   name='SALSA_model_test')
     
@@ -502,7 +502,8 @@ def get_model(input_shape, resnet_style='basic', n_classes=12, azi_only = False)
     # To do : custom metrics, loss 
     # placeholder metrics until can settle DCASE SELD metrics
     model.compile(optimizer     = opt, 
-                  loss          = weighted_seld_loss,
+                  loss          = ['binary_crossentropy', compute_azimuth_regression_loss],
+                  loss_weights  = [0.3, 0.7],
                   metrics       = ['accuracy' , MeanAbsoluteError()])
 
     return model
