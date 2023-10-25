@@ -7,7 +7,7 @@ Just run the main the file and it will generate the demo dataset in "../dataset/
 """
 
 import h5py
-from sklearn.model_selection import train_test_split
+import tensorflow as tf
 import pandas as pd
 import numpy as np
 import os
@@ -106,7 +106,16 @@ def create_dataset():
         
         
 if __name__ == "__main__":
-    d , sed , doa = create_dataset()
+    # Ensure that script working directory is same directory as the script
+    abspath = os.path.abspath(__file__)
+    dname = os.path.dirname(abspath)
+    print("Changing directory to : ", dname)
+    os.chdir(dname)
+    
+    # Create arrays for feature, ground truth labels dataset
+    d , sed, doa = create_dataset()
+    
+    # Create directories for storage
     os.makedirs('../dataset/demo_dataset/', exist_ok=True)
     try:
         feature_fp = "../dataset/demo_dataset/demo_salsalite_features.npy"
