@@ -510,7 +510,7 @@ def get_model(input_shape, resnet_style='basic', n_classes=12, azi_only = False,
     #               metrics       = ['accuracy'])
     model.compile(optimizer = opt,
                   loss = seld_loss,
-                  metrics = 'accuracy')
+                  metrics = location_dependent_accuracy)
 
     return model
 

@@ -24,7 +24,7 @@ os.chdir(dname)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 resnet_style = 'basic'
 n_classes = 3
-batch_size = 10
+batch_size = 5
 
 # Load dataset
 demo_dataset_dir    = "../dataset/demo_dataset"
@@ -36,6 +36,21 @@ class_gt_labels     = np.load(class_label_fp, allow_pickle=True)
 doa_gt_labels       = np.load(doa_label_fp, allow_pickle=True)
 single_array_list   = np.concatenate((class_gt_labels, doa_gt_labels), axis=-1)
 
+# Create dataset generator 
+def dataset_gen():
+    for d, l in zip(feature_dataset, single_array_list):
+        yield (d,l)
+
+dataset = tf.data.Dataset.from_generator(
+    dataset_gen,
+    output_signature=(
+        tf.TensorSpec(shape = feature_dataset.shape[1:],
+                      dtype = tf.float32),
+        tf.TensorSpec(shape = single_array_list.shape[1:],
+                      dtype = tf.float32)
+    )
+)
+
 # Get input size of one input 
 total_samples = len(feature_dataset)
 input_shape = feature_dataset[0].shape
@@ -44,7 +59,8 @@ input_shape = feature_dataset[0].shape
 salsa_lite_model = get_model(input_shape=input_shape, 
                              resnet_style=resnet_style, 
                              n_classes=n_classes,
-                             azi_only=True)
+                             azi_only=True,
+                             batch_size=batch_size)
 # salsa_lite_model.summary()
 
 # Model Training Configurations
@@ -81,17 +97,6 @@ x_train, x_val, y_train, y_val      = train_test_split(x_train,
                                                        y_train,
                                                        test_size=0.25)
 
-# # Split the dataset into train (60%) , validation (20%) , test (20%)
-# x_train , x_test , cls_train , cls_test, doa_train, doa_test  = train_test_split(feature_dataset, 
-#                                                                                  class_gt_labels, 
-#                                                                                  doa_gt_labels,
-#                                                                                  test_size = 0.2)
-# # 0.25 * 0.8 = 0.2
-# x_train , x_val , cls_train , cls_val, doa_train, doa_val = train_test_split(x_train, 
-#                                                                              cls_train, 
-#                                                                              doa_train,
-#                                                                              test_size = 0.25)
-
 print("training split size   : {}".format(len(x_train)))
 print("validation split size : {}".format(len(x_val)))
 print("test split size       : {}".format(len(x_test)))
@@ -99,19 +104,19 @@ print("test split size       : {}".format(len(x_test)))
 # Checking if GPU is being used
 print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
 
-# Train model
-demo_model_hist = salsa_lite_model.fit(x_train,
-                                       y_train,
-                                       batch_size=batch_size,
-                                       epochs=30,
-                                       initial_epoch=0,
-                                       verbose=1,
-                                       validation_data=(x_val, y_val),
-                                       callbacks = callbacks_list,
-                                       shuffle=True)
+# # Train model
+# demo_model_hist = salsa_lite_model.fit(x_train,
+#                                        y_train,
+#                                        batch_size=batch_size,
+#                                        epochs=1,
+#                                        initial_epoch=0,
+#                                        verbose=1,
+#                                        validation_data=(x_val, y_val),
+#                                        callbacks = callbacks_list,
+#                                        shuffle=True)
 
-salsa_lite_model.save_weights('../experiments/model_last.h5')
-np.save('../experiments/demo_model_hist.npy', salsa_lite_model.history, allow_pickle=True)
+# salsa_lite_model.save_weights('../experiments/model_last.h5')
+# np.save('../experiments/demo_model_hist.npy', salsa_lite_model.history, allow_pickle=True)
 
 # # Evaluation 
 # salsa_lite_model.load_weights('../experiments/model_last.h5')
