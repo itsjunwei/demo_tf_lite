@@ -440,7 +440,7 @@ def doa_fcn(input, azi_only=False, n_classes=12):
     
     return doa_output
 
-def get_model(input_shape, resnet_style='basic', n_classes=12, azi_only = False, batch_size = 10):
+def get_model(input_shape, resnet_style='basic', n_classes=12, azi_only = False, batch_size = 100):
     """
     The entire SALSA-Lite model, using Keras functional API to design and flow
 
@@ -510,7 +510,7 @@ def get_model(input_shape, resnet_style='basic', n_classes=12, azi_only = False,
     #               metrics       = ['accuracy'])
     model.compile(optimizer = opt,
                   loss = seld_loss,
-                  metrics = location_dependent_accuracy)
+                  metrics = 'accuracy')
 
     return model
 
