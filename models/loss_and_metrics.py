@@ -16,16 +16,85 @@ from keras.losses import binary_crossentropy
 import pandas as pd
 from keras.losses import Loss, MeanAbsoluteError
 
-def compute_azimuth_regression_loss(y_true, y_pred):
+def seld_loss(y_true, y_pred):
+    """
+    Assuming we our model takes in one input and outputs two seperate predictions
+        - One array for SED and another for DOA
+        
+    From there, we calculate each loss seperately and compute a weighted loss
+    """
+    print(y_pred['doa_pred'])
+    print(y_pred['event_pred'])
+    sed_pred = y_pred[0]
+    doa_pred = y_pred[1]
     
-    mask = tf.cast(tf.not_equal(y_true, 0), tf.float32)
-    masked_y_pred = mask*y_pred
-    loss_object = MeanAbsoluteError()
-    doa_loss = loss_object(y_true, masked_y_pred)
+    sed_gt   = y_true[0]
+    doa_gt   = y_true[1]
+    
+    sed_loss = binary_crossentropy(y_true=sed_gt,
+                                   y_pred=sed_pred,
+                                   from_logits=False)
+    
+    mask = tf.repeat(sed_gt, repeats=[2], axis=-1)
+    print(doa_pred.shape)
+    masked_doa = tf.multiply(mask, doa_pred)
+
+    doa_loss = masked_reg_loss_azimuth(event_frame_gt=sed_gt,
+                                       doa_frame_gt=doa_gt,
+                                       doa_frame_output=doa_pred,
+                                       n_classes=3)
+    
+    weights = [0.3, 0.7]
+    
+    loss = weights[0] * sed_loss + weights[1] * doa_loss
+    
+    return loss
+
+
+
+def hardcoded_MRL(y_true, y_pred):
+    """
+    y_true = [x,x,x , y,y,y]
+    """
+    
+    xs = y_true[: , : , :3]
+    ys = y_true[: , : , 3:]
+    
+    azimuths = tf.atan2(ys,xs)
+    condition = tf.not_equal(azimuths,0)
+    mask = tf.where(condition, 1, 0)
+    doa_loss = masked_reg_loss_azimuth(event_frame_gt=azimuths,
+                                       doa_frame_gt=y_true,
+                                       doa_frame_output=y_pred,
+                                       n_classes=3)
     
     return doa_loss
     
-def weighted_seld_loss(y_true, y_pred):
+
+def array_sed_loss(y_true, y_pred):
+    
+    sed_gt = y_true[0]
+    sed_pred = y_pred[0]
+    sed_loss = binary_crossentropy(y_true=sed_gt,
+                                   y_pred=sed_pred,
+                                   from_logits=False)
+    
+    return sed_loss
+
+def array_doa_loss(y_true, y_pred):
+    sed_gt = y_true[0]
+    azi_gt = y_true[1]
+    event_frame_pred = y_pred[0]
+    doa_output = y_pred[1]
+    
+    doa_loss = masked_reg_loss_azimuth(event_frame_gt=sed_gt,
+                                       doa_frame_gt=azi_gt, 
+                                       doa_frame_output=doa_output,
+                                       n_classes=3)
+    
+    return doa_loss
+    
+def weighted_seld_loss_array(y_true, y_pred):
     """
     Generate weighted SELD loss. Keras custom loss functions must only take (y_true, y_pred)
     as parameters. 
@@ -62,8 +131,7 @@ def weighted_seld_loss(y_true, y_pred):
     
     return seld_loss
 
-
-def weighted_loss(target_dict, pred_dict, n_classes=12, loss_weights=[0.3, 0.7]):
+def weighted_seld_loss(target_dict, pred_dict, n_classes=3, loss_weights=[0.3, 0.7]):
 
     """
     Use this function in the case when the output is in a single dictionary of 
@@ -82,10 +150,10 @@ def weighted_loss(target_dict, pred_dict, n_classes=12, loss_weights=[0.3, 0.7])
     sed_weight = loss_weights[0]
     doa_weight = loss_weights[1]
 
-    event_frame_logit = pred_dict['event_frame_logit']
-    event_frame_gt = target_dict['event_frame_gt']
-    doa_frame_output = pred_dict['doa_frame_output']
-    doa_frame_gt = target_dict['doa_frame_gt']
+    event_frame_logit = pred_dict['event_pred']
+    event_frame_gt = target_dict['event_gt']
+    doa_frame_output = pred_dict['doa_pred']
+    doa_frame_gt = target_dict['doa_gt']
 
     doa_loss = compute_doa_reg_loss(doa_frame_gt, doa_frame_output, n_classes)
     sed_loss = binary_crossentropy(event_frame_gt, event_frame_logit)
@@ -93,6 +161,35 @@ def weighted_loss(target_dict, pred_dict, n_classes=12, loss_weights=[0.3, 0.7])
     total_loss = sed_weight*sed_loss + doa_weight*doa_loss
 
     return total_loss
+
+def weighted_seld_metric(target_dict, pred_dict, n_classes=3, loss_weights=[0.3, 0.7]):
+
+    """
+    Use this function in the case when the output is in a single dictionary of 
+    pred_dict = {
+        'event_frame_logit': event_frame_logit,
+        'doa_frame_output': doa_output,
+    }
+
+    Accordingly, the ground truth has also to be the same dictionary of 
+    target_dict = {
+        'event_frame_gt' : event_frame_gt,
+        'doa_frame_gt' : doa_frame_gt
+    }
+    """
+
+    sed_weight = loss_weights[0]
+    doa_weight = loss_weights[1]
+
+    event_frame_logit = pred_dict['event_pred']
+    event_frame_gt = target_dict['event_gt']
+    doa_frame_output = pred_dict['doa_pred']
+    doa_frame_gt = target_dict['doa_gt']
+    
+    ce = tf.keras.losses.CategoricalCrossentropy()
+    ce_loss = ce(event_frame_gt, event_frame_logit)
+    
+    pass
 
 def interpolate_tensor(tensor, ratio: float = 1.0):
     """
@@ -193,7 +290,7 @@ def compute_masked_reg_loss(input, target, mask, loss_type="MAE"):
     :param target: batch_size, n_timestpes, n_classes
     :param mask: batch_size, n_timestpes, n_classes
     :param loss_type: choice: MSE or MAE. MAE is better for SMN
-    """
+    """    
     # Align the time_steps of output and target
     N = min(input.shape[1], target.shape[1])
 

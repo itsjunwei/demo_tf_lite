@@ -8,10 +8,12 @@ __pycache__/
 # generated data files
 data/
 features/
+features_upvolume/
 outputs/
 dataset/data
 dataset/meta
 dataset/cleaned_data
+dataset/cleaned_data_upvolume
 testing/
 offline/
 dataset/demo_dataset

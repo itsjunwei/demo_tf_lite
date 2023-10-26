@@ -180,11 +180,17 @@ def compute_scaler(feature_dir):
 
 
 if __name__ == "__main__":
+    # Ensure that script working directory is same directory as the script
+    abspath = os.path.abspath(__file__)
+    dname = os.path.dirname(abspath)
+    print("Changing directory to : ", dname)
+    os.chdir(dname)
+    
     
     classes = ['dog', 'impact', 'speech']
     for cls in classes:
         
-        audio_dir = './cleaned_data/{}'.format(cls)
-        feature_dir = './features/{}'.format(cls)
+        audio_dir = './cleaned_data_upvolume/{}'.format(cls)
+        feature_dir = './features_upvolume/{}'.format(cls)
         extract_features(audio_dir, feature_dir)
         compute_scaler(feature_dir)

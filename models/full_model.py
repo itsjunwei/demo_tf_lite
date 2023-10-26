@@ -4,7 +4,7 @@ from keras.layers import Add, ReLU, Dense
 from keras import backend, Model
 from keras.metrics import MeanAbsoluteError
 import tensorflow as tf
-from loss_and_metrics import compute_azimuth_regression_loss
+from loss_and_metrics import *
 from model_utils import * 
 
 
@@ -390,7 +390,7 @@ def sed_fcn(x, n_classes=12):
     x = Dense(512, activation="relu")(x)
     x = Dropout(0.2)(x)
     x = Dense(n_classes, name='event_frame_logits')(x)
-    x = Activation('sigmoid', name='event_frame_pred')(x)
+    x = Activation('sigmoid', name='event_pred')(x)
 
     # (batch_size, time_steps, n_classes)
     return x
@@ -433,14 +433,14 @@ def doa_fcn(input, azi_only=False, n_classes=12):
         
     if azi_only:
         # (batch_size, time_steps, 2 * n_classes)
-        doa_output = Concatenate(name="doa_frame_output")([x_out, y_out])
+        doa_output = Concatenate(name="doa_pred")([x_out, y_out])
     else:
         # (batch_size, time_steps, 3 * n_classes)
-        doa_output = Concatenate(name='doa_frame_output')([x_out, y_out, z_out])
+        doa_output = Concatenate(name='doa_pred')([x_out, y_out, z_out])
     
     return doa_output
 
-def get_model(input_shape, resnet_style='basic', n_classes=12, azi_only = False):
+def get_model(input_shape, resnet_style='basic', n_classes=12, azi_only = False, batch_size = 10):
     """
     The entire SALSA-Lite model, using Keras functional API to design and flow
 
@@ -470,7 +470,10 @@ def get_model(input_shape, resnet_style='basic', n_classes=12, azi_only = False)
     """
     
     # Create input of salsa-lite features
-    inputs = Input(shape=input_shape, name = "salsa-lite_features", sparse=False)
+    inputs = Input(shape=input_shape,
+                   batch_size=batch_size,
+                   name = "salsa-lite_features", 
+                   sparse=False)
     
     # Initial 2 x conv blocks for input
     input = conv_block(inputs, 64)
@@ -501,10 +504,14 @@ def get_model(input_shape, resnet_style='basic', n_classes=12, azi_only = False)
 
     # To do : custom metrics, loss 
     # placeholder metrics until can settle DCASE SELD metrics
-    model.compile(optimizer     = opt, 
-                  loss          = ['binary_crossentropy', compute_azimuth_regression_loss],
-                  loss_weights  = [0.3, 0.7],
-                  metrics       = ['accuracy' , MeanAbsoluteError()])
+    # model.compile(optimizer     = opt, 
+    #               loss          = [binary_crossentropy, MeanAbsoluteError()],
+    #               loss_weights  = [0.2, 0.8],
+    #               metrics       = ['accuracy'])
+    model.compile(optimizer = opt,
+                  loss = {'event_pred' : seld_loss,
+                          'doa_pred' : seld_loss},
+                  metrics = 'accuracy')
 
     return model
 

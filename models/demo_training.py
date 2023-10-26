@@ -19,8 +19,10 @@ print("Changing directory to : ", dname)
 os.chdir(dname)
 
 # Global model settings
+# os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 resnet_style = 'basic'
 n_classes = 3
+batch_size = 10
 
 # Load dataset
 demo_dataset_dir    = "../dataset/demo_dataset"
@@ -72,14 +74,12 @@ callbacks_list = [checkpoint, early, tensorboard_callback, csv_logger, schedule]
 x_train , x_test , cls_train , cls_test, doa_train, doa_test  = train_test_split(feature_dataset, 
                                                                                  class_gt_labels, 
                                                                                  doa_gt_labels,
-                                                                                 test_size = 0.2, 
-                                                                                 random_state=2023)
+                                                                                 test_size = 0.2)
 # 0.25 * 0.8 = 0.2
 x_train , x_val , cls_train , cls_val, doa_train, doa_val = train_test_split(x_train, 
                                                                              cls_train, 
                                                                              doa_train,
-                                                                             test_size = 0.25, 
-                                                                             random_state=2023)
+                                                                             test_size = 0.25)
 
 print("training split size   : {}".format(len(x_train)))
 print("validation split size : {}".format(len(x_val)))
@@ -91,8 +91,8 @@ print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
 # Train model
 demo_model_hist = salsa_lite_model.fit(x_train,
                                        [cls_train, doa_train],
-                                       batch_size=100,
-                                       epochs=50,
+                                       batch_size=batch_size,
+                                       epochs=30,
                                        initial_epoch=0,
                                        verbose=1,
                                        validation_data=(x_val, [cls_val, doa_val]),
@@ -101,3 +101,19 @@ demo_model_hist = salsa_lite_model.fit(x_train,
 
 salsa_lite_model.save_weights('../experiments/model_last.h5')
 np.save('../experiments/demo_model_hist.npy', salsa_lite_model.history, allow_pickle=True)
+
+# # Evaluation 
+# salsa_lite_model.load_weights('../experiments/model_last.h5')
+# predictions = salsa_lite_model.predict(x_test)
+# cls_predictions = [i.flatten() for i in predictions[0]]
+# doa_predictions = [j.flatten() for j in predictions[1]]
+
+# # cls_flattened = [cls['event_gt'].flatten() for cls in y_test]
+# # doa_flattened = [doa['doa_gt'].flatten() for doa in y_test]
+# cls_flattened = [k.flatten() for k in cls_test]
+# doa_flattened = [l.flatten() for l in doa_test]
+
+# pd.DataFrame(cls_predictions).to_csv('../experiments/outputs/cls_pred.csv', index=False, header=False)
+# pd.DataFrame(doa_predictions).to_csv('../experiments/outputs/doa_pred.csv', index=False, header=False)
+# pd.DataFrame(cls_flattened).to_csv('../experiments/outputs/cls_gt.csv', index=False, header=False)
+# pd.DataFrame(doa_flattened).to_csv('../experiments/outputs/doa_gt.csv', index=False, header=False)
