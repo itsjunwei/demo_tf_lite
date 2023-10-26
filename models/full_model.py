@@ -492,11 +492,11 @@ def get_model(input_shape, resnet_style='basic', n_classes=12, azi_only = False,
     # Create output
     event_frame_pred = sed_fcn(bigru_output, n_classes)
     doa_output = doa_fcn(bigru_output, azi_only, n_classes)
-
+    single_array_output = Concatenate(name="final_output")([event_frame_pred, doa_output])
 
     # Create model 
     model = Model(inputs=inputs,
-                  outputs=[event_frame_pred, doa_output], 
+                  outputs=single_array_output, 
                   name='SALSA_model_test')
     
     # To do : figure out how to configure optimizers
@@ -509,8 +509,7 @@ def get_model(input_shape, resnet_style='basic', n_classes=12, azi_only = False,
     #               loss_weights  = [0.2, 0.8],
     #               metrics       = ['accuracy'])
     model.compile(optimizer = opt,
-                  loss = {'event_pred' : seld_loss,
-                          'doa_pred' : seld_loss},
+                  loss = seld_loss,
                   metrics = 'accuracy')
 
     return model

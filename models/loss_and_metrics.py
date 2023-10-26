@@ -18,178 +18,49 @@ from keras.losses import Loss, MeanAbsoluteError
 
 def seld_loss(y_true, y_pred):
     """
-    Assuming we our model takes in one input and outputs two seperate predictions
-        - One array for SED and another for DOA
+    Assuming we our model takes in one input and outputs one concatenated array
+        - [sed_pred .... doa_pred]
+        - sed_pred -> n_classes
+        - doa_pred -> n_classes * 2 (x,y coordinates)
         
     From there, we calculate each loss seperately and compute a weighted loss
-    """
-    print(y_pred['doa_pred'])
-    print(y_pred['event_pred'])
-    sed_pred = y_pred[0]
-    doa_pred = y_pred[1]
     
-    sed_gt   = y_true[0]
-    doa_gt   = y_true[1]
+    Also noted that Tensorflow loss function is defined by y_true, y_pred in that order
+    
+    Returns:
+        seld_loss : weighted seld_loss
+        
+    To do:
+        Is it possible to have external configuration parameters passed through the loss
+        function instead of hard-coding self-defined variables? 
+    """
+
+    # y_pred and y_true shapes are the same
+    # shape : (batch_size, n_timesteps, n_classes * 3) 
+    # first n_classes --> SED output
+    # remaining --> DOA output for [x * n_classes ... y * n_classes]
+
+    n_classes = 3
+    sed_pred = y_pred[:, : , :n_classes]
+    doa_pred = y_pred[:, : , n_classes:]
+    
+    sed_gt   = y_true[:, : , :n_classes]
+    doa_gt   = y_true[:, : , n_classes:]
     
     sed_loss = binary_crossentropy(y_true=sed_gt,
                                    y_pred=sed_pred,
                                    from_logits=False)
-    
-    mask = tf.repeat(sed_gt, repeats=[2], axis=-1)
-    print(doa_pred.shape)
-    masked_doa = tf.multiply(mask, doa_pred)
 
     doa_loss = masked_reg_loss_azimuth(event_frame_gt=sed_gt,
                                        doa_frame_gt=doa_gt,
                                        doa_frame_output=doa_pred,
-                                       n_classes=3)
+                                       n_classes=n_classes)
     
+    # hardcoded for now
     weights = [0.3, 0.7]
-    
     loss = weights[0] * sed_loss + weights[1] * doa_loss
     
     return loss
-
-
-
-def hardcoded_MRL(y_true, y_pred):
-    """
-    y_true = [x,x,x , y,y,y]
-    """
-    
-    xs = y_true[: , : , :3]
-    ys = y_true[: , : , 3:]
-    
-    azimuths = tf.atan2(ys,xs)
-    condition = tf.not_equal(azimuths,0)
-    mask = tf.where(condition, 1, 0)
-    doa_loss = masked_reg_loss_azimuth(event_frame_gt=azimuths,
-                                       doa_frame_gt=y_true,
-                                       doa_frame_output=y_pred,
-                                       n_classes=3)
-    
-    return doa_loss
-    
-
-def array_sed_loss(y_true, y_pred):
-    
-    sed_gt = y_true[0]
-    sed_pred = y_pred[0]
-    sed_loss = binary_crossentropy(y_true=sed_gt,
-                                   y_pred=sed_pred,
-                                   from_logits=False)
-    
-    return sed_loss
-
-def array_doa_loss(y_true, y_pred):
-    sed_gt = y_true[0]
-    azi_gt = y_true[1]
-    event_frame_pred = y_pred[0]
-    doa_output = y_pred[1]
-    
-    doa_loss = masked_reg_loss_azimuth(event_frame_gt=sed_gt,
-                                       doa_frame_gt=azi_gt, 
-                                       doa_frame_output=doa_output,
-                                       n_classes=3)
-    
-    return doa_loss
-    
-def weighted_seld_loss_array(y_true, y_pred):
-    """
-    Generate weighted SELD loss. Keras custom loss functions must only take (y_true, y_pred)
-    as parameters. 
-    
-    Number of classes (n_classes = 3) and weights (0.3 , 0.7) are hard-coded.
-    
-    The model output has a label rate of 5fps. For the demo, each input is 200ms, which will
-    result in one label per input. 
-
-    Args:
-        y_true : ground truth
-        y_pred : predictions
-
-    Returns:
-        seld_loss : weighted seld loss
-    """
-    # y_true : [[class], [azimuth]]
-    # y_pred : [[event_frame_pred], [doa_output]]
-    
-    n_classes = 3 # hardcoded
-    weights = [0.3, 0.7]
-    
-    sed_gt = y_true[0]
-    azi_gt = y_true[1]
-    event_frame_pred = y_pred[0]
-    doa_output = y_pred[1]
-    sed_loss = binary_crossentropy(sed_gt, event_frame_pred)
-    doa_loss = masked_reg_loss_azimuth(event_frame_gt=sed_gt,
-                                       doa_frame_gt=azi_gt, 
-                                       doa_frame_output=doa_output, 
-                                       n_classes=n_classes)
-    
-    seld_loss = weights[0] * sed_loss + weights[1] * doa_loss
-    
-    return seld_loss
-
-def weighted_seld_loss(target_dict, pred_dict, n_classes=3, loss_weights=[0.3, 0.7]):
-
-    """
-    Use this function in the case when the output is in a single dictionary of 
-    pred_dict = {
-        'event_frame_logit': event_frame_logit,
-        'doa_frame_output': doa_output,
-    }
-
-    Accordingly, the ground truth has also to be the same dictionary of 
-    target_dict = {
-        'event_frame_gt' : event_frame_gt,
-        'doa_frame_gt' : doa_frame_gt
-    }
-    """
-
-    sed_weight = loss_weights[0]
-    doa_weight = loss_weights[1]
-
-    event_frame_logit = pred_dict['event_pred']
-    event_frame_gt = target_dict['event_gt']
-    doa_frame_output = pred_dict['doa_pred']
-    doa_frame_gt = target_dict['doa_gt']
-
-    doa_loss = compute_doa_reg_loss(doa_frame_gt, doa_frame_output, n_classes)
-    sed_loss = binary_crossentropy(event_frame_gt, event_frame_logit)
-
-    total_loss = sed_weight*sed_loss + doa_weight*doa_loss
-
-    return total_loss
-
-def weighted_seld_metric(target_dict, pred_dict, n_classes=3, loss_weights=[0.3, 0.7]):
-
-    """
-    Use this function in the case when the output is in a single dictionary of 
-    pred_dict = {
-        'event_frame_logit': event_frame_logit,
-        'doa_frame_output': doa_output,
-    }
-
-    Accordingly, the ground truth has also to be the same dictionary of 
-    target_dict = {
-        'event_frame_gt' : event_frame_gt,
-        'doa_frame_gt' : doa_frame_gt
-    }
-    """
-
-    sed_weight = loss_weights[0]
-    doa_weight = loss_weights[1]
-
-    event_frame_logit = pred_dict['event_pred']
-    event_frame_gt = target_dict['event_gt']
-    doa_frame_output = pred_dict['doa_pred']
-    doa_frame_gt = target_dict['doa_gt']
-    
-    ce = tf.keras.losses.CategoricalCrossentropy()
-    ce_loss = ce(event_frame_gt, event_frame_logit)
-    
-    pass
 
 def interpolate_tensor(tensor, ratio: float = 1.0):
     """
@@ -260,6 +131,21 @@ def write_classwise_output(pred_dict, filename):
     pass
 
 def masked_reg_loss_azimuth(event_frame_gt, doa_frame_gt, doa_frame_output, n_classes):
+    """
+    Higher function to calculate regression loss for azimuth predictions.
+    
+    Will calculate the loss for each X and Y coordinate predictions and add them
+    
+    Inputs:
+        event_frame_gt      : (tensor) ground truth for the sound event detection, shape : (batch_size, n_timesteps, n_classes)
+        doa_frame_gt        : (tensor) ground truth for DOA, shape : (batch_size, n_timesteps, n_classes*2)
+        doa_frame_output    : (tensor) DOA predictions, shape : (batch_size, n_timesteps, n_classes*2)
+        n_classes           : (int) number of possible active event classes  
+        
+    Returns:
+        azi_loss    : (float) regression loss for the azimuth predictions
+    """
+    
     x_loss = compute_masked_reg_loss(input=doa_frame_output[:, :, : n_classes],
                                      target=doa_frame_gt[:, :, : n_classes],
                                      mask=event_frame_gt)
@@ -267,29 +153,22 @@ def masked_reg_loss_azimuth(event_frame_gt, doa_frame_gt, doa_frame_output, n_cl
                                      target=doa_frame_gt[:, :, n_classes:2*n_classes],
                                      mask=event_frame_gt)
     azi_loss = x_loss + y_loss
+    
     return azi_loss
 
-def compute_doa_reg_loss(target_dict, pred_dict, n_classes):
-    x_loss = compute_masked_reg_loss(input=pred_dict['doa_frame_output'][:, :, : n_classes],
-                                        target=target_dict['doa_frame_gt'][:, :, : n_classes],
-                                        mask=target_dict['event_frame_gt'])
-    y_loss = compute_masked_reg_loss(input=pred_dict['doa_frame_output'][:, :, n_classes:2*n_classes],
-                                        target=target_dict['doa_frame_gt'][:, :, n_classes:2*n_classes],
-                                        mask=target_dict['event_frame_gt'])
-    z_loss = compute_masked_reg_loss(input=pred_dict['doa_frame_output'][:, :, 2 * n_classes:],
-                                        target=target_dict['doa_frame_gt'][:, :, 2 * n_classes:],
-                                        mask=target_dict['event_frame_gt'])
-    doa_loss = x_loss + y_loss + z_loss
 
-    return doa_loss
-
-def compute_masked_reg_loss(input, target, mask, loss_type="MAE"):
+def compute_masked_reg_loss(input, target, mask):
     """
-    Compute masked mean loss.
-    :param input: batch_size, n_timesteps, n_classes
-    :param target: batch_size, n_timestpes, n_classes
-    :param mask: batch_size, n_timestpes, n_classes
-    :param loss_type: choice: MSE or MAE. MAE is better for SMN
+    Compute masked mean loss. Currently, only masked mean absolute error is implemented
+    
+    Inputs:
+        note that all inputs are of shape (batch_size, n_timesteps, n_classes)
+        input   : DOA predictions, usually of only one coordinate
+        target  : DOA ground truth
+        mask    : Active event classes 
+        
+    Returns:
+        reg_loss : masked regression loss
     """    
     # Align the time_steps of output and target
     N = min(input.shape[1], target.shape[1])
@@ -298,13 +177,13 @@ def compute_masked_reg_loss(input, target, mask, loss_type="MAE"):
     target = target[:, 0: N, :]
     mask = mask[:, 0: N, :]
 
-    normalize_value = np.sum(mask)
+    # we use keras backend functions to do math
+    
+    # Formula:
+    # sum{ |input - target| * mask } 
+    # ______________________________
+    # sum{          mask           }
 
-    if loss_type == 'MAE':
-        reg_loss = np.sum(np.abs(input - target) * mask) / normalize_value
-    elif loss_type == 'MSE':
-        reg_loss = np.sum((input - target) ** 2 * mask) / normalize_value
-    else:
-        raise ValueError('Unknown reg loss type: {}'.format(loss_type))
-
+    reg_loss = tf.keras.backend.sum(tf.keras.backend.abs(input-target)*mask)/tf.keras.backend.sum(mask)
+    
     return reg_loss
