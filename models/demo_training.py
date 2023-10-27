@@ -24,7 +24,7 @@ os.chdir(dname)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 resnet_style = 'basic'
 n_classes = 3
-batch_size = 50
+batch_size = 10
 dataset_split = [0.6, 0.2, 0.2]
 
 
@@ -44,8 +44,9 @@ dataset_size        = len(feature_dataset)
 
 # Create dataset generator 
 def dataset_gen():
-    for d, l in zip(feature_dataset, single_array_list):
-        yield (d,l)
+    while True:
+        for d, l in zip(feature_dataset, single_array_list):
+            yield (d,l)
 
 # Create the dataset class itself
 dataset = tf.data.Dataset.from_generator(
@@ -88,6 +89,9 @@ test_dataset = test_dataset.prefetch(tf.data.AUTOTUNE)
 # Get input size of one input 
 total_samples = len(feature_dataset)
 input_shape = feature_dataset[0].shape
+# print("Train size : ", len(train_dataset))
+# print("Val size   : ", len(validation_dataset))
+# print("Test size  : ", len(test_dataset))
 print("Batch size : ", batch_size)
 print("Input shape: ", input_shape)
 
@@ -129,14 +133,22 @@ callbacks_list = [checkpoint, early, tensorboard_callback, csv_logger, schedule]
 # Checking if GPU is being used
 print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
 
+
+"""
+In this case, specifying steps_per_epoch will cause the dataset generator to not run
+infinitely (we want it to run once per epoch). So in this case, we do not specify the value.
+The first epoch will show xxx/unknown for the progress bar and that is fine. 
+"""
+
 # Train model
 demo_model_hist = salsa_lite_model.fit(train_dataset,
-                                       steps_per_epoch=int(train_size/batch_size), 
                                        epochs = 2,
                                        initial_epoch = 0,
                                        validation_data = validation_dataset,
-                                    #    callbacks = callbacks_list,
+                                       callbacks = callbacks_list,
                                        verbose = 1)
+
+
 
 # salsa_lite_model.save_weights('../experiments/model_last.h5')
 # np.save('../experiments/demo_model_hist.npy', salsa_lite_model.history, allow_pickle=True)

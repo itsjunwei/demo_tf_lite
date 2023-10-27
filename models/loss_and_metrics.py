@@ -157,6 +157,6 @@ def location_dependent_accuracy(y_true, y_pred):
                     TP += 1
             except:
                 pass
-
+    er_cd = 1 - (TP/len(sed_gt))
     
-    return TP/len(sed_gt)
+    return er_cd

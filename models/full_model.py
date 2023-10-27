@@ -509,8 +509,7 @@ def get_model(input_shape, resnet_style='basic', n_classes=12, azi_only = False,
     #               loss_weights  = [0.2, 0.8],
     #               metrics       = ['accuracy'])
     model.compile(optimizer = opt,
-                  loss = seld_loss,
-                  metrics = 'accuracy')
+                  loss = seld_loss)
 
     return model
 

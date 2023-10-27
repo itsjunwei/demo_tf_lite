@@ -168,14 +168,14 @@ def compute_scaler(feature_dir):
     feature_mean = np.expand_dims(feature_mean, axis=1)
     feature_std = np.expand_dims(feature_std, axis=1)
 
-    scaler_path = os.path.join(feature_dir, cls + '_feature_scaler.h5')
+    scaler_path = os.path.join('./features/scalers', cls + '_feature_scaler.h5')
     with h5py.File(scaler_path, 'w') as hf:
         hf.create_dataset('mean', data=feature_mean, dtype=np.float32)
         hf.create_dataset('std', data=feature_std, dtype=np.float32)
 
     print('Features shape: {}'.format(afeature.shape))
-    print('mean {}: {}'.format(feature_mean.shape, feature_mean))
-    print('std {}: {}'.format(feature_std.shape, feature_std))
+    # print('mean {}: {}'.format(feature_mean.shape, feature_mean))
+    # print('std {}: {}'.format(feature_std.shape, feature_std))
     print('Scaler path: {}'.format(scaler_path))
 
 
@@ -190,7 +190,7 @@ if __name__ == "__main__":
     classes = ['dog', 'impact', 'speech']
     for cls in classes:
         
-        audio_dir = './cleaned_data_upvolume/{}'.format(cls)
-        feature_dir = './features_upvolume/{}'.format(cls)
+        audio_dir = './cleaned_data/{}'.format(cls)
+        feature_dir = './features/{}'.format(cls)
         extract_features(audio_dir, feature_dir)
         compute_scaler(feature_dir)

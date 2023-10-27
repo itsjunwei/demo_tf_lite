@@ -38,7 +38,7 @@ def load_file(filepath):
 
     
     # After downsampling 16x, should result in only one label per input
-    assert len(features[0])//16 == 1, "Please check SALSA-Lite feature size"
+    assert len(features[0])//16 == 1, "Please check SALSA-Lite feature size -->{}".format(features[0].shape)
     
     # Converting to one-hot encoding
     class_labels = ['dog',
