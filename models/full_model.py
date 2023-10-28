@@ -504,12 +504,10 @@ def get_model(input_shape, resnet_style='basic', n_classes=12, azi_only = False,
 
     # To do : custom metrics, loss 
     # placeholder metrics until can settle DCASE SELD metrics
-    # model.compile(optimizer     = opt, 
-    #               loss          = [binary_crossentropy, MeanAbsoluteError()],
-    #               loss_weights  = [0.2, 0.8],
-    #               metrics       = ['accuracy'])
-    model.compile(optimizer = opt,
-                  loss = seld_loss)
+    model.compile(optimizer     = opt,
+                  loss          = [sed_loss , doa_loss],
+                  loss_weights  = [0.3, 0.7],
+                  metrics       = [sed_loss, doa_loss])
 
     return model
 

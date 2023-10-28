@@ -62,6 +62,46 @@ def seld_loss(y_true, y_pred):
     
     return loss
 
+def sed_loss(y_true, y_pred):
+    """Similar to the weighted SELD loss, except in this case, we only calculate
+    the SED loss. One loss returns one value in TensorFlow so using this plus 
+    DOA loss can help us see and track the loss values better
+
+    Returns:
+        sed_loss : binary crossentropy loss for SED classification
+    """
+    n_classes = 3
+    sed_pred = y_pred[:, : , :n_classes]
+    sed_gt   = y_true[:, : , :n_classes]
+
+    
+    sed_loss = binary_crossentropy(y_true=sed_gt,
+                                   y_pred=sed_pred,
+                                   from_logits=False)
+    
+    return sed_loss 
+
+def doa_loss(y_true, y_pred):
+    """Similar to the weighted SELD loss, except in this case, we only calculate
+    the DOA loss. One loss returns one value in TensorFlow so using this plus 
+    SED loss can help us see and track the loss values better
+
+    Returns:
+        doa_loss : masked mean absolute error for the loss for DOA regression
+    """
+    n_classes = 3
+    doa_pred = y_pred[:, : , n_classes:]
+    
+    sed_gt   = y_true[:, : , :n_classes]
+    doa_gt   = y_true[:, : , n_classes:]
+    
+    doa_loss = masked_reg_loss_azimuth(event_frame_gt=sed_gt,
+                                       doa_frame_gt=doa_gt,
+                                       doa_frame_output=doa_pred,
+                                       n_classes=n_classes)
+    
+    return doa_loss
+
 def masked_reg_loss_azimuth(event_frame_gt, doa_frame_gt, doa_frame_output, n_classes):
     """
     Higher function to calculate regression loss for azimuth predictions.
@@ -119,8 +159,8 @@ def compute_masked_reg_loss(input, target, mask):
     
     return reg_loss
 
-def location_dependent_accuracy(y_true, y_pred):
-    """Calculate the location dependent accuracy for the predictions.
+def location_dependent_error_rate(y_true, y_pred):
+    """Calculate the location dependent error rate for the predictions.
     
     To classify as a correct prediction, the active class must be within a certain,
     predefined range of error. This parameter is hard-coded for now as 10 degrees.
