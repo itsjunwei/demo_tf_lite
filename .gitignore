@@ -3,6 +3,7 @@ saved_models/
 __pycache__/
 *.py[cod]
 *.csv
+*.h5
 
 
 # generated data files
@@ -19,3 +20,4 @@ offline/
 dataset/demo_dataset
 logs/
 experiments/
+analysis/
