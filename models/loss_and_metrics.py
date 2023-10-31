@@ -200,3 +200,150 @@ def location_dependent_error_rate(y_true, y_pred):
     er_cd = 1 - (TP/len(sed_gt))
     
     return er_cd
+
+def remove_batch_dim(tens):
+    """Remove the batch dimension from an input tensor or 3D array
+    Assumes that the input is of shape (batch_size x frames_per_batch x n_classes)
+    
+    Combines the batches and returns (frames_total x n_classes)
+    """
+    # tens : (batch size, frames, n_classes)
+    full_frames = tens.shape[0] * tens.shape[1] # combine all batches
+    tens = tens.reshape(full_frames, tens.shape[2]) # should be (n_frames_total, n_classes) final
+    return tens
+
+def convert_xy_to_azimuth(array, 
+                          n_classes=3):
+    if not array.shape[-1] == 2*n_classes:
+        print("Check  ", array.shape)
+    else:
+        x_coords = array[: , :n_classes]
+        y_coords = array[: , n_classes:]
+        azimuths = np.arctan2(y_coords, x_coords)
+        azimuth_deg = np.degrees(azimuths)
+        azimuth_final = (azimuth_deg+360)%360
+
+        return azimuth_final    
+
+class SELDMetrics(object):
+    def __init__(self, 
+                 model, 
+                 val_dataset, 
+                 epoch_count, 
+                 doa_threshold = 10, 
+                 n_classes = 3,
+                 sed_threshold = 0.5):
+        
+        # Define self variables 
+        self.model = model
+        self.val_dataset = val_dataset
+        self.epoch_count = epoch_count + 1
+        self.n_classes = n_classes
+        self.doa_threshold = doa_threshold
+        self.sed_threshold = sed_threshold
+        
+        # For SED metrics (F1 score)
+        self._TP = 0
+        self._FP = 0
+        self._FN = 0
+
+        # Substitutions, Deletion and Insertion errors (ER_CD)
+        self._S = 0
+        self._D = 0
+        self._I = 0
+        self._Nref = 0
+        
+        # For DOA metrics
+        self.doa_err = 0 # accumulated doa error for correct SED predictions
+        self._TP_count = 0 # no. of correct SED predictions
+        self._DE_FN = 0 # correct SED predictions but wrong DOA estimate
+
+
+    def update_seld_metrics(self):
+        """Essentialy, this will act as the validation epoch. 
+        It will cycle through the dataset generator, compute predictions for each batch
+        and update the SELD scores. 
+        """
+        
+        # This is for a dataset created using the .from_generator() function
+        for x_val, y_val in self.val_dataset: 
+            
+            predictions = self.model.predict(x_val, 
+                                             verbose=0)
+
+            # Extract the SED values from the single array
+            SED_pred = remove_batch_dim(np.array(predictions[:, :, :self.n_classes]))
+            SED_gt   = remove_batch_dim(np.array(y_val[:, :, :self.n_classes])) 
+            # If the probability exceeds the threshold --> considered active
+            SED_pred = (SED_pred > self.sed_threshold).astype(int)
+            
+            # Extract the DOA values (X,Y) and convert them into azimuth
+            azi_gt   = convert_xy_to_azimuth(remove_batch_dim(np.array(y_val[:, : , self.n_classes:])))
+            azi_pred = convert_xy_to_azimuth(remove_batch_dim(np.array(predictions[:, : , self.n_classes:])))
+            try:
+                with open('./predtest.txt', 'a+') as f:
+                    f.write(SED_pred.flatten())
+                    f.write('\n')
+                    f.write(azi_pred.flatten())
+                    
+                with open('./gttest.txt', 'a+') as g:
+                    g.write(SED_gt.flatten())
+                    g.write('\n')
+                    g.write(azi_gt.flatten())
+            except:
+                pass
+            # compute False Negatives (FN), False Positives (FP) and True Positives (TP)
+            loc_FN = np.logical_and(SED_gt == 1, SED_pred == 0).sum(1)
+            loc_FP = np.logical_and(SED_gt == 0, SED_pred == 1).sum(1)
+            TP_sed = np.logical_and(SED_gt == 1, SED_pred == 1)
+            # to be considered correct prediction, the DOA difference must be within threshold
+            TP_doa = np.abs(azi_gt - azi_pred) < self.doa_threshold 
+            loc_TP = np.logical_and(TP_sed, TP_doa).sum()
+            
+            # Update substitution, deletion and insertion errors
+            self._S += np.minimum(loc_FP, loc_FN).sum()
+            self._D += np.maximum(0, loc_FN - loc_FP).sum()
+            self._I += np.maximum(0, loc_FP - loc_FN).sum()
+            self._Nref += SED_gt.sum() # just getting the total number of estimates
+            
+            # Similarly, update TP, FN and FP 
+            self._TP += loc_TP
+            self._FN += loc_FN.sum()
+            self._FP += loc_FP.sum()
+            
+            # Class Dependent Localization Error
+            # total doa error for predictions of correct active class events 
+            self.doa_err += np.multiply(TP_sed, np.abs(azi_gt - azi_pred)).sum()
+            # count of correct active class event predictions
+            self._TP_count += TP_sed.sum()
+            
+            # For class-dependent localization F1 score
+            FN_doa = np.abs(azi_gt - azi_pred) > self.doa_threshold # outside threshold
+            loc_FN = np.logical_and(TP_sed, FN_doa).sum() # correct SED, wrong DOA
+            self._DE_FN += loc_FN # total count of correct SED, wrong DOA
+
+    def calculate_seld_metrics(self):
+        """Generate the SELD metrics from the calculated values
+        Differs from the code provided by DCASE as this is demo-specific
+        
+        Returns:
+            _ER     : (float) Error Rate
+            _F1     : (float) F1 Score
+            LE_CD   : (float) Localization Error
+            LE_F1   : (float) Localization F1 Score 
+        """
+        eps = np.finfo(np.float).eps
+        
+        # ER (localization dependent error rate)
+        _ER = (self._S + self._D + self._I) / (self._Nref + eps)
+        
+        # F1 (localization dependent F1 score)
+        _F1 = self._TP / (eps + self._TP + 0.5 * (self._FP + self._FN))
+
+        # LE_CD (class dependent localization error)
+        LE_CD = self.doa_err / self._TP_count
+        
+        # LE_F1 (class dependent F1 score)
+        LE_F1 = self._TP_count / (eps + self._TP_count + self._DE_FN)
+
+        return _ER, _F1, LE_CD, LE_F1

@@ -89,11 +89,11 @@ test_dataset = test_dataset.prefetch(tf.data.AUTOTUNE)
 # Get input size of one input 
 total_samples = len(feature_dataset)
 input_shape = feature_dataset[0].shape
-# print("Train size : ", len(train_dataset))
-# print("Val size   : ", len(validation_dataset))
-# print("Test size  : ", len(test_dataset))
-print("Batch size : ", batch_size)
-print("Input shape: ", input_shape)
+print("Train size   : ", train_size)
+print("Val size     : ", val_size)
+print("Test size    : ", test_size)
+print("Batch size   : ", batch_size)
+print("Input shape  : ", input_shape)
 
 # Get the salsa-lite model
 salsa_lite_model = get_model(input_shape=input_shape, 
@@ -104,15 +104,15 @@ salsa_lite_model = get_model(input_shape=input_shape,
 # salsa_lite_model.summary()
 
 # Model Training Configurations
-checkpoint = ModelCheckpoint("../experiments/salsalite_demo_{epoch:03d}_loss_{loss:.4f}.h5",
-                             monitor="val_loss",
-                             verbose=1,
-                             save_weights_only=False,
-                             save_best_only=True)
+# checkpoint = ModelCheckpoint("../experiments/salsalite_demo_{epoch:03d}_loss_{loss:.4f}.h5",
+#                              monitor="val_loss",
+#                              verbose=0,
+#                              save_weights_only=False,
+#                              save_best_only=True)
 
-early = EarlyStopping(monitor="val_loss",
-                      mode="min",
-                      patience=10)
+# early = EarlyStopping(monitor="val_loss",
+#                       mode="min",
+#                       patience=10)
 
 def scheduler(epoch, lr):
     if epoch < 35:
@@ -128,7 +128,11 @@ csv_logger = CSVLogger(filename = '../experiments/training_demo.csv', append=Fal
 
 tensorboard_callback = TensorBoard(log_dir='../experiments/logs', histogram_freq=1)
 
-callbacks_list = [checkpoint, early, tensorboard_callback, csv_logger, schedule]
+
+# custom_ER = ER_CD()
+
+# callbacks_list = [checkpoint, early, tensorboard_callback, csv_logger, schedule]
+callbacks_list = [tensorboard_callback, csv_logger, schedule]
 
 # Checking if GPU is being used
 print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
@@ -137,34 +141,48 @@ print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
 """
 In this case, specifying steps_per_epoch will cause the dataset generator to not run
 infinitely (we want it to run once per epoch). So in this case, we do not specify the value.
-The first epoch will show xxx/unknown for the progress bar and that is fine. 
+The first epoch will show xxx/unknown for the progress bar (if verbose = 1) and that is fine. 
 """
 
 # Train model
-demo_model_hist = salsa_lite_model.fit(train_dataset,
-                                       epochs = 2,
-                                       initial_epoch = 0,
-                                       validation_data = validation_dataset,
-                                       callbacks = callbacks_list,
-                                       verbose = 1)
+"""Adjusting the code to run in such a way that it will train once per epoch, track the losses
+and then predict on the validation set after each training epoch. It will then take the 
+predictions and do manual metrics calculation. To track val_loss, need to include the validation
+dataset into model.fit(). """
+total_epochs = 1
 
+for epoch_count in range(total_epochs):
+    
+    demo_model_hist = salsa_lite_model.fit(train_dataset,
+                                           epochs = epoch_count+1,
+                                           initial_epoch = epoch_count,
+                                           callbacks = callbacks_list,
+                                           verbose = 2)
+    
+    seld_metrics = SELDMetrics(model= salsa_lite_model,
+                               val_dataset = validation_dataset,
+                               epoch_count = epoch_count,
+                               n_classes = n_classes)
+    
+    seld_metrics.update_seld_metrics()
+    er_sed , sed_F1 , loc_err , loc_F1 = seld_metrics.calculate_seld_metrics()
+    seld_err = 0.25 * (er_sed + (1 - sed_F1) + (loc_err/180) + (1-loc_F1))
+    print("""
+          Epoch: {} , 
+          SELD Error : {:.3f} , 
+          ER : {:.3f} , 
+          F1 : {:.3f}, 
+          LE : {:.3f}, 
+          LR : {:.3f}
+          """.format(seld_err, er_sed, sed_F1, loc_err, loc_F1))
+    
 
+# demo_model_hist = salsa_lite_model.fit(train_dataset,
+#                                        epochs = 1,
+#                                        initial_epoch = 0,
+#                                        validation_data = validation_dataset,
+#                                        callbacks = callbacks_list,
+#                                        verbose = 2)
 
 # salsa_lite_model.save_weights('../experiments/model_last.h5')
 # np.save('../experiments/demo_model_hist.npy', salsa_lite_model.history, allow_pickle=True)
-
-# # Evaluation 
-# salsa_lite_model.load_weights('../experiments/model_last.h5')
-# predictions = salsa_lite_model.predict(x_test)
-# cls_predictions = [i.flatten() for i in predictions[0]]
-# doa_predictions = [j.flatten() for j in predictions[1]]
-
-# # cls_flattened = [cls['event_gt'].flatten() for cls in y_test]
-# # doa_flattened = [doa['doa_gt'].flatten() for doa in y_test]
-# cls_flattened = [k.flatten() for k in cls_test]
-# doa_flattened = [l.flatten() for l in doa_test]
-
-# pd.DataFrame(cls_predictions).to_csv('../experiments/outputs/cls_pred.csv', index=False, header=False)
-# pd.DataFrame(doa_predictions).to_csv('../experiments/outputs/doa_pred.csv', index=False, header=False)
-# pd.DataFrame(cls_flattened).to_csv('../experiments/outputs/cls_gt.csv', index=False, header=False)
-# pd.DataFrame(doa_flattened).to_csv('../experiments/outputs/doa_gt.csv', index=False, header=False)
