@@ -24,30 +24,12 @@ Split into sections
     - setup model flow and configurations
     - return the model
 
-4. Training/Checkpointing 
-    - to do
-
-5. Inference
-    - to do
-
-    
-Main Code
-
-Uses Keras Functional API to design the model flow
-
 To-do
 -----
 
 Implement ResNet optimizations
 - Combination of both DSC and BTN
 - Is it possible to combine all the layers into one model class for readability (?)
-
-Training
-- Input/Ground Truths (data generator)
-- SELD Metrics (decide how to implement for demo)
-- Optimizations / Momentum / Learning Rate etc. 
-- Implement training (start off with DCASE 2021 data)
-- Convert to dictionary for output (appears to work better)
 """
 
 
@@ -187,8 +169,7 @@ def micro_resnet_block(x, out_channels, stride):
     return x
 
 def micro_bottleneck_block(x, out_channels, stride, downsample_factor = 4):
-    """
-    Bottleneck blocks works by downsizing the input by factor d, followed by applying
+    """Bottleneck blocks works by downsizing the input by factor d, followed by applying
     standard convolution filters on the downsized input. Finally, it will upsample the
     resulting feature maps to a higher number of channels (original or not).
     
@@ -257,8 +238,7 @@ def micro_bottleneck_block(x, out_channels, stride, downsample_factor = 4):
     return x
 
 def micro_dsc_block(x, out_channels, stride):
-    """
-    Similar to the micro_resnet_block, but we replace each 3x3 convolution
+    """Similar to the micro_resnet_block, but we replace each 3x3 convolution
     filter with a depthwise convolution, followed by a pointwise convolution
     
     Input
@@ -314,8 +294,7 @@ def micro_dsc_block(x, out_channels, stride):
     return x
 
 def frequency_pooling(x, pooling_type='avg'):
-    """
-    Implementation of the frequency pooling layer
+    """Implementation of the frequency pooling layer
 
     Input
     -----
@@ -342,9 +321,7 @@ def frequency_pooling(x, pooling_type='avg'):
     return x
 
 def bigru_unit(x, add_dense=False):
-
-    """
-    Implementation of the BiGRU decoder
+    """Implementation of the BiGRU decoder
 
     Unsure if there is a need for `TimeDistributed(Dense(512))` to further 
     refine the BiGRU output
@@ -352,13 +329,11 @@ def bigru_unit(x, add_dense=False):
     Input
     -----
     x           : (np.array) input data
-    add_dense   : (boolean) True if adding the `TimeDistributed Dense` layer,
-                            False otherwise
+    add_dense   : (boolean) True if adding the `TimeDistributed Dense` layer, False otherwise
 
     Returns
     -------
     x           : (np.array) output data
-
     """
     
     # To do : check how to merge the final bigru
@@ -370,7 +345,7 @@ def bigru_unit(x, add_dense=False):
     
     return bigru2
 
-def sed_fcn(x, n_classes=12):
+def sed_fcn(x, n_classes=3):
     """
     Fully connected layer for SED (multi-label, multi-class classification)
 
@@ -395,7 +370,7 @@ def sed_fcn(x, n_classes=12):
     # (batch_size, time_steps, n_classes)
     return x
 
-def doa_fcn(input, azi_only=False, n_classes=12):
+def doa_fcn(input, azi_only=False, n_classes=3):
     """
     Fully connected layer for DOA (regression)
 
@@ -408,7 +383,7 @@ def doa_fcn(input, azi_only=False, n_classes=12):
     Returns
     -------
 
-    doa_output  : (np.array) output data of shape (batch_size, time_steps, 3 * n_classes)
+    doa_output  : (np.array) output data of shape (batch_size, time_steps, 2/3 * n_classes)
     """
 
     # X-Direction
@@ -440,7 +415,11 @@ def doa_fcn(input, azi_only=False, n_classes=12):
     
     return doa_output
 
-def get_model(input_shape, resnet_style='basic', n_classes=12, azi_only = False, batch_size = 100):
+def get_model(input_shape, 
+              resnet_style='basic', 
+              n_classes=12, 
+              azi_only = False, 
+              batch_size = 100):
     """
     The entire SALSA-Lite model, using Keras functional API to design and flow
 
@@ -463,6 +442,7 @@ def get_model(input_shape, resnet_style='basic', n_classes=12, azi_only = False,
     resnet_style    : (str) the type of ResNet to be used in the model
     n_classes       : (int) number of possible event classes 
     azi_only        : (boolean) True if only predicting Azimuth (X,Y) , False otherwise
+    batch_size      : (int) batch size. Meant to pass through the Input to the model
 
     Returns
     -------
@@ -472,7 +452,7 @@ def get_model(input_shape, resnet_style='basic', n_classes=12, azi_only = False,
     # Create input of salsa-lite features
     inputs = Input(shape=input_shape,
                    batch_size=batch_size,
-                   name = "salsa-lite_features", 
+                   name = "salsa_lite_features", 
                    sparse=False)
     
     # Initial 2 x conv blocks for input
@@ -523,7 +503,6 @@ if __name__ == "__main__":
     n_classes = 3
     azi_only = True
     salsa_lite_model = get_model(input_size, resnet_style, n_classes, azi_only)
-
     salsa_lite_model.summary(show_trainable=True)
 
     # To convert and save the model into tflite version 

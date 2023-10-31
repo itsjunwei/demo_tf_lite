@@ -20,7 +20,7 @@ dname = os.path.dirname(abspath)
 print("Changing directory to : ", dname)
 os.chdir(dname)
 
-# Global model settings
+# Global model settings, put into configs / .yml file eventually
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 resnet_style = 'basic'
 n_classes = 3
@@ -70,9 +70,10 @@ shuffled_dataset = dataset.shuffle(dataset_size)
 # Create the training dataset
 train_dataset = shuffled_dataset.take(train_size)
 train_dataset = train_dataset.batch(batch_size=batch_size)
-# Most dataset input pipelines should end with a call to prefetch. 
-# This allows later elements to be prepared while the current element is being processed.
-# Tensorflow says this is best practice so just going to follow
+
+"""Most dataset input pipelines should end with a call to prefetch. This 
+allows later elements to be prepared while the current element is being processed.
+Tensorflow says this is best practice so just going to follow"""
 train_dataset = train_dataset.prefetch(tf.data.AUTOTUNE) 
 remaining_dataset = shuffled_dataset.skip(train_size)
 
@@ -104,15 +105,15 @@ salsa_lite_model = get_model(input_shape=input_shape,
 # salsa_lite_model.summary()
 
 # Model Training Configurations
-# checkpoint = ModelCheckpoint("../experiments/salsalite_demo_{epoch:03d}_loss_{loss:.4f}.h5",
-#                              monitor="val_loss",
-#                              verbose=0,
-#                              save_weights_only=False,
-#                              save_best_only=True)
+checkpoint = ModelCheckpoint("../experiments/salsalite_demo_{epoch:03d}_loss_{loss:.4f}.h5",
+                             monitor="val_loss",
+                             verbose=2,
+                             save_weights_only=False,
+                             save_best_only=True)
 
-# early = EarlyStopping(monitor="val_loss",
-#                       mode="min",
-#                       patience=10)
+early = EarlyStopping(monitor="val_loss",
+                      mode="min",
+                      patience=10)
 
 def scheduler(epoch, lr):
     if epoch < 35:
@@ -128,36 +129,32 @@ csv_logger = CSVLogger(filename = '../experiments/training_demo.csv', append=Fal
 
 tensorboard_callback = TensorBoard(log_dir='../experiments/logs', histogram_freq=1)
 
-
-# custom_ER = ER_CD()
-
 # callbacks_list = [checkpoint, early, tensorboard_callback, csv_logger, schedule]
 callbacks_list = [tensorboard_callback, csv_logger, schedule]
 
 # Checking if GPU is being used
 print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
 
-
-"""
-In this case, specifying steps_per_epoch will cause the dataset generator to not run
-infinitely (we want it to run once per epoch). So in this case, we do not specify the value.
-The first epoch will show xxx/unknown for the progress bar (if verbose = 1) and that is fine. 
-"""
-
 # Train model
 """Adjusting the code to run in such a way that it will train once per epoch, track the losses
 and then predict on the validation set after each training epoch. It will then take the 
 predictions and do manual metrics calculation. To track val_loss, need to include the validation
-dataset into model.fit(). """
-total_epochs = 1
+dataset into model.fit(). 
+
+In this case, specifying steps_per_epoch will cause the dataset generator to not run
+infinitely (we want it to run once per epoch). So in this case, we do not specify the value.
+The first epoch will show xxx/unknown for the progress bar (if verbose = 1) and that is fine. 
+"""
+total_epochs = 10
 
 for epoch_count in range(total_epochs):
     
     demo_model_hist = salsa_lite_model.fit(train_dataset,
-                                           epochs = epoch_count+1,
-                                           initial_epoch = epoch_count,
-                                           callbacks = callbacks_list,
-                                           verbose = 2)
+                                           epochs           = epoch_count+1,
+                                           initial_epoch    = epoch_count,
+                                           validation_data  = validation_dataset,
+                                           callbacks        = callbacks_list,
+                                           verbose          = 2)
     
     seld_metrics = SELDMetrics(model= salsa_lite_model,
                                val_dataset = validation_dataset,
@@ -167,22 +164,7 @@ for epoch_count in range(total_epochs):
     seld_metrics.update_seld_metrics()
     er_sed , sed_F1 , loc_err , loc_F1 = seld_metrics.calculate_seld_metrics()
     seld_err = 0.25 * (er_sed + (1 - sed_F1) + (loc_err/180) + (1-loc_F1))
-    print("""
-          Epoch: {} , 
-          SELD Error : {:.3f} , 
-          ER : {:.3f} , 
-          F1 : {:.3f}, 
-          LE : {:.3f}, 
-          LR : {:.3f}
-          """.format(seld_err, er_sed, sed_F1, loc_err, loc_F1))
-    
+    print("SELD Error : {:.3f} , ER : {:.3f} , F1 : {:.3f}, LE : {:.3f}, LR : {:.3f}".format(seld_err, er_sed, sed_F1, loc_err, loc_F1))
 
-# demo_model_hist = salsa_lite_model.fit(train_dataset,
-#                                        epochs = 1,
-#                                        initial_epoch = 0,
-#                                        validation_data = validation_dataset,
-#                                        callbacks = callbacks_list,
-#                                        verbose = 2)
-
-# salsa_lite_model.save_weights('../experiments/model_last.h5')
-# np.save('../experiments/demo_model_hist.npy', salsa_lite_model.history, allow_pickle=True)
+salsa_lite_model.save_weights('../experiments/model_last.h5')
+np.save('../experiments/demo_model_hist.npy', salsa_lite_model.history, allow_pickle=True)

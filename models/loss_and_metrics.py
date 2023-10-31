@@ -230,9 +230,9 @@ class SELDMetrics(object):
                  model, 
                  val_dataset, 
                  epoch_count, 
-                 doa_threshold = 10, 
+                 doa_threshold = 20, 
                  n_classes = 3,
-                 sed_threshold = 0.5):
+                 sed_threshold = 0.3):
         
         # Define self variables 
         self.model = model
@@ -280,18 +280,7 @@ class SELDMetrics(object):
             # Extract the DOA values (X,Y) and convert them into azimuth
             azi_gt   = convert_xy_to_azimuth(remove_batch_dim(np.array(y_val[:, : , self.n_classes:])))
             azi_pred = convert_xy_to_azimuth(remove_batch_dim(np.array(predictions[:, : , self.n_classes:])))
-            try:
-                with open('./predtest.txt', 'a+') as f:
-                    f.write(SED_pred.flatten())
-                    f.write('\n')
-                    f.write(azi_pred.flatten())
-                    
-                with open('./gttest.txt', 'a+') as g:
-                    g.write(SED_gt.flatten())
-                    g.write('\n')
-                    g.write(azi_gt.flatten())
-            except:
-                pass
+
             # compute False Negatives (FN), False Positives (FP) and True Positives (TP)
             loc_FN = np.logical_and(SED_gt == 1, SED_pred == 0).sum(1)
             loc_FP = np.logical_and(SED_gt == 0, SED_pred == 1).sum(1)
