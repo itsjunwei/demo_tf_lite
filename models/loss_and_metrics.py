@@ -283,9 +283,9 @@ class SELDMetrics(object):
         for x_val, y_val in self.val_dataset: 
             
             predictions = self.model.predict(x_val, 
-                                             verbose=0,
+                                             verbose          = 0,
                                              max_queue_size   = 50,
-                                             workers          = 4)
+                                             workers          = 8)
 
             # Extract the SED values from the single array
             SED_pred = remove_batch_dim(np.array(predictions[:, :, :self.n_classes]))

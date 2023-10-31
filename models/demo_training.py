@@ -151,7 +151,7 @@ infinitely (we want it to run once per epoch). So in this case, we do not specif
 The first epoch will show xxx/unknown for the progress bar (if verbose = 1) and that is fine. 
 """
 total_epochs = 10
-train_stats = np.zeros(total_epochs)
+train_stats = []
 for epoch_count in range(total_epochs):
     
     demo_model_hist = salsa_lite_model.fit(train_dataset,
@@ -161,7 +161,7 @@ for epoch_count in range(total_epochs):
                                            callbacks        = callbacks_list,
                                            verbose          = 2,
                                            max_queue_size   = 50,
-                                           workers          = 4) # testing workers param
+                                           workers          = 8) # testing workers param
     
     seld_metrics = SELDMetrics(model        = salsa_lite_model,
                                val_dataset  = validation_dataset,
@@ -171,14 +171,14 @@ for epoch_count in range(total_epochs):
     seld_metrics.update_seld_metrics()
     er_sed , sed_F1 , loc_err , loc_F1 = seld_metrics.calculate_seld_metrics()
     seld_err = 0.25 * (er_sed + (1 - sed_F1) + (loc_err/180) + (1-loc_F1))
-    train_stats[epoch_count] = [seld_err, er_sed, sed_F1, loc_err, loc_F1]
+    train_stats.append([seld_err, er_sed, sed_F1, loc_err, loc_F1])
     print("SELD Error : {:.3f} , ER : {:.3f} , F1 : {:.3f}, LE : {:.3f}, LR : {:.3f}".format(seld_err, er_sed, sed_F1, loc_err, loc_F1))
 
 salsa_lite_model.save_weights('../experiments/model_last.h5')
 np.save('../experiments/demo_model_hist.npy', salsa_lite_model.history, allow_pickle=True)
 
-testing = False
-if testing: 
+is_inference = False
+if is_inference == True: 
     # Inference Section on Test Set
     csv_data = []
     for x_test, y_test in test_dataset:
@@ -196,3 +196,5 @@ if testing:
             
     df = pd.DataFrame(csv_data, columns = ['SED_pred', 'Azimuth_pred', 'SED_gt', 'Azimuth_gt'])
     df.to_csv('../experiments/outputs/test_data.csv', index=False, header=True)
+else:
+    print("Done!")
