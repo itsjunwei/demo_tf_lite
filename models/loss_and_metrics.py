@@ -159,6 +159,7 @@ def compute_masked_reg_loss(input, target, mask):
     
     return reg_loss
 
+# not used
 def location_dependent_error_rate(y_true, y_pred):
     """Calculate the location dependent error rate for the predictions.
     
@@ -214,16 +215,29 @@ def remove_batch_dim(tens):
 
 def convert_xy_to_azimuth(array, 
                           n_classes=3):
+    """Converting an array of X,Y predictions into an array of azimuths.
+    [x1, x2, ... , xn, y1, y2, ... , yn] into [azi1, azi2, ... , azin]
+    
+    Inputs:
+        array       : (np.ndarray) An array of X,Y predictions
+        n_classes   : (int) `n` or number of possible active classes. Code will
+                       manually set n_classes if it is incorrect.
+                       
+    Returns:
+        azimuth_final : (np.ndarray) Array of azimuths"""
+        
     if not array.shape[-1] == 2*n_classes:
         print("Check  ", array.shape)
-    else:
-        x_coords = array[: , :n_classes]
-        y_coords = array[: , n_classes:]
-        azimuths = np.arctan2(y_coords, x_coords)
-        azimuth_deg = np.degrees(azimuths)
-        azimuth_final = (azimuth_deg+360)%360
+        n_classes = array.shape[-1]//2
+        print("Manually setting n_classes to be half of last dim, ", n_classes)
+    
+    x_coords = array[: , :n_classes]
+    y_coords = array[: , n_classes:]
+    azimuths = np.arctan2(y_coords, x_coords)
+    azimuth_deg = np.degrees(azimuths)
+    azimuth_final = (azimuth_deg + 360) % 360 # Crop the azimuths to be [0, 360)
 
-        return azimuth_final    
+    return azimuth_final    
 
 class SELDMetrics(object):
     def __init__(self, 
@@ -269,7 +283,9 @@ class SELDMetrics(object):
         for x_val, y_val in self.val_dataset: 
             
             predictions = self.model.predict(x_val, 
-                                             verbose=0)
+                                             verbose=0,
+                                             max_queue_size   = 50,
+                                             workers          = 4)
 
             # Extract the SED values from the single array
             SED_pred = remove_batch_dim(np.array(predictions[:, :, :self.n_classes]))
@@ -290,10 +306,10 @@ class SELDMetrics(object):
             loc_TP = np.logical_and(TP_sed, TP_doa).sum()
             
             # Update substitution, deletion and insertion errors
-            self._S += np.minimum(loc_FP, loc_FN).sum()
-            self._D += np.maximum(0, loc_FN - loc_FP).sum()
-            self._I += np.maximum(0, loc_FP - loc_FN).sum()
-            self._Nref += SED_gt.sum() # just getting the total number of estimates
+            self._S     += np.minimum(loc_FP, loc_FN).sum()
+            self._D     += np.maximum(0, loc_FN - loc_FP).sum()
+            self._I     += np.maximum(0, loc_FP - loc_FN).sum()
+            self._Nref  += SED_gt.sum() # just getting the total number of estimates
             
             # Similarly, update TP, FN and FP 
             self._TP += loc_TP

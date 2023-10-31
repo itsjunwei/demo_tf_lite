@@ -2,15 +2,20 @@
 Full training code for the demo dataset
 
 Similar to the ASC code
+
+To do:
+    - Fix batch size error with the GRU layer
+    - Add noise data to the mix and test again 
+    - Add logger
+    - Global settings into .yml file
 """
 from loss_and_metrics import *
 from full_model import * 
+import pandas as pd
 import os 
-import sys
 import tensorflow as tf
 import logging
 from keras.callbacks import ModelCheckpoint, EarlyStopping, LearningRateScheduler, CSVLogger, TensorBoard
-from sklearn.model_selection import train_test_split
 
 # Ensure that script working directory is same directory as the script
 os.system('cls')
@@ -146,7 +151,7 @@ infinitely (we want it to run once per epoch). So in this case, we do not specif
 The first epoch will show xxx/unknown for the progress bar (if verbose = 1) and that is fine. 
 """
 total_epochs = 10
-
+train_stats = np.zeros(total_epochs)
 for epoch_count in range(total_epochs):
     
     demo_model_hist = salsa_lite_model.fit(train_dataset,
@@ -154,17 +159,40 @@ for epoch_count in range(total_epochs):
                                            initial_epoch    = epoch_count,
                                            validation_data  = validation_dataset,
                                            callbacks        = callbacks_list,
-                                           verbose          = 2)
+                                           verbose          = 2,
+                                           max_queue_size   = 50,
+                                           workers          = 4) # testing workers param
     
-    seld_metrics = SELDMetrics(model= salsa_lite_model,
-                               val_dataset = validation_dataset,
-                               epoch_count = epoch_count,
-                               n_classes = n_classes)
+    seld_metrics = SELDMetrics(model        = salsa_lite_model,
+                               val_dataset  = validation_dataset,
+                               epoch_count  = epoch_count,
+                               n_classes    = n_classes)
     
     seld_metrics.update_seld_metrics()
     er_sed , sed_F1 , loc_err , loc_F1 = seld_metrics.calculate_seld_metrics()
     seld_err = 0.25 * (er_sed + (1 - sed_F1) + (loc_err/180) + (1-loc_F1))
+    train_stats[epoch_count] = [seld_err, er_sed, sed_F1, loc_err, loc_F1]
     print("SELD Error : {:.3f} , ER : {:.3f} , F1 : {:.3f}, LE : {:.3f}, LR : {:.3f}".format(seld_err, er_sed, sed_F1, loc_err, loc_F1))
 
 salsa_lite_model.save_weights('../experiments/model_last.h5')
 np.save('../experiments/demo_model_hist.npy', salsa_lite_model.history, allow_pickle=True)
+
+testing = False
+if testing: 
+    # Inference Section on Test Set
+    csv_data = []
+    for x_test, y_test in test_dataset:
+        test_predictions = salsa_lite_model.predict(x_test, verbose = 0)
+        SED_pred = remove_batch_dim(np.array(test_predictions[:, :, :n_classes]))
+        SED_gt   = remove_batch_dim(np.array(y_test[:, :, :n_classes]))
+        SED_pred = (SED_pred > 0.3).astype(int)      
+        
+        AZI_gt   = convert_xy_to_azimuth(remove_batch_dim(np.array(y_test[:, : , n_classes:])))
+        AZI_pred = convert_xy_to_azimuth(remove_batch_dim(np.array(test_predictions[:, : , n_classes:])))
+
+        for i in range(len(SED_pred)):
+            output = np.concatenate([SED_pred[i], AZI_pred[i], SED_gt[i], AZI_gt[i]], axis=-1)
+            csv_data.append(output.flatten())
+            
+    df = pd.DataFrame(csv_data, columns = ['SED_pred', 'Azimuth_pred', 'SED_gt', 'Azimuth_gt'])
+    df.to_csv('../experiments/outputs/test_data.csv', index=False, header=True)
