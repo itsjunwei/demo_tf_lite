@@ -29,7 +29,7 @@ os.chdir(dname)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 resnet_style = 'basic'
 n_classes = 3
-batch_size = 10
+batch_size = 32
 dataset_split = [0.6, 0.2, 0.2]
 
 
@@ -49,9 +49,8 @@ dataset_size        = len(feature_dataset)
 
 # Create dataset generator 
 def dataset_gen():
-    while True:
-        for d, l in zip(feature_dataset, single_array_list):
-            yield (d,l)
+    for d, l in zip(feature_dataset, single_array_list):
+        yield (d,l)
 
 # Create the dataset class itself
 dataset = tf.data.Dataset.from_generator(
@@ -73,23 +72,25 @@ test_size  = int(dataset_split[2] * dataset_size)
 shuffled_dataset = dataset.shuffle(dataset_size)
 
 # Create the training dataset
-train_dataset = shuffled_dataset.take(train_size)
-train_dataset = train_dataset.batch(batch_size=batch_size)
+train_dataset       = shuffled_dataset.take(train_size)
+
+train_dataset       = train_dataset.batch(batch_size     = batch_size,
+                                          drop_remainder = True)
+
+remaining_dataset   = shuffled_dataset.skip(train_size)
+
+validation_dataset  = remaining_dataset.take(val_size).batch(batch_size = batch_size, 
+                                                             drop_remainder = True)
+
+test_dataset        = remaining_dataset.skip(val_size).batch(batch_size = batch_size, 
+                                                             drop_remainder = True)
+
 
 """Most dataset input pipelines should end with a call to prefetch. This 
 allows later elements to be prepared while the current element is being processed.
 Tensorflow says this is best practice so just going to follow"""
 train_dataset = train_dataset.prefetch(tf.data.AUTOTUNE) 
-remaining_dataset = shuffled_dataset.skip(train_size)
-
-# Create validation dataset
-validation_dataset = remaining_dataset.take(val_size)
-validation_dataset = validation_dataset.batch(batch_size=batch_size)
 validation_dataset = validation_dataset.prefetch(tf.data.AUTOTUNE)
-
-# Create test dataset
-test_dataset = remaining_dataset.skip(val_size)
-test_dataset = test_dataset.batch(batch_size=batch_size)
 test_dataset = test_dataset.prefetch(tf.data.AUTOTUNE)
 
 # Get input size of one input 
@@ -102,11 +103,12 @@ print("Batch size   : ", batch_size)
 print("Input shape  : ", input_shape)
 
 # Get the salsa-lite model
-salsa_lite_model = get_model(input_shape=input_shape, 
-                             resnet_style=resnet_style, 
-                             n_classes=n_classes,
-                             azi_only=True,
-                             batch_size=batch_size)
+salsa_lite_model = get_model(input_shape    = input_shape, 
+                             resnet_style   = resnet_style, 
+                             n_classes      = n_classes,
+                             azi_only       = True,
+                             batch_size     = batch_size)
+salsa_lite_model.reset_states()
 # salsa_lite_model.summary()
 
 # Model Training Configurations
@@ -149,8 +151,13 @@ dataset into model.fit().
 In this case, specifying steps_per_epoch will cause the dataset generator to not run
 infinitely (we want it to run once per epoch). So in this case, we do not specify the value.
 The first epoch will show xxx/unknown for the progress bar (if verbose = 1) and that is fine. 
+
+TODO
+    - Implement tracking metrics if do not wish to use EarlyStopping on `val_loss`, SALSA-Lite used
+      minimum SELD_Error
+    - Fix batch size limitation (GRU layer)
 """
-total_epochs = 10
+total_epochs = 2
 train_stats = []
 for epoch_count in range(total_epochs):
     
@@ -159,9 +166,7 @@ for epoch_count in range(total_epochs):
                                            initial_epoch    = epoch_count,
                                            validation_data  = validation_dataset,
                                            callbacks        = callbacks_list,
-                                           verbose          = 2,
-                                           max_queue_size   = 50,
-                                           workers          = 8) # testing workers param
+                                           verbose          = 2)
     
     seld_metrics = SELDMetrics(model        = salsa_lite_model,
                                val_dataset  = validation_dataset,
@@ -177,8 +182,8 @@ for epoch_count in range(total_epochs):
 salsa_lite_model.save_weights('../experiments/model_last.h5')
 np.save('../experiments/demo_model_hist.npy', salsa_lite_model.history, allow_pickle=True)
 
-is_inference = False
-if is_inference == True: 
+is_inference = True
+if is_inference: 
     # Inference Section on Test Set
     csv_data = []
     for x_test, y_test in test_dataset:
@@ -191,10 +196,10 @@ if is_inference == True:
         AZI_pred = convert_xy_to_azimuth(remove_batch_dim(np.array(test_predictions[:, : , n_classes:])))
 
         for i in range(len(SED_pred)):
-            output = np.concatenate([SED_pred[i], AZI_pred[i], SED_gt[i], AZI_gt[i]], axis=-1)
+            output = np.concatenate([SED_pred[i], SED_gt[i], AZI_pred[i], AZI_gt[i]], axis=-1)
             csv_data.append(output.flatten())
             
-    df = pd.DataFrame(csv_data, columns = ['SED_pred', 'Azimuth_pred', 'SED_gt', 'Azimuth_gt'])
-    df.to_csv('../experiments/outputs/test_data.csv', index=False, header=True)
+    df = pd.DataFrame(csv_data)
+    df.to_csv('../experiments/outputs/test_data.csv', index=False, header=False)
 else:
     print("Done!")

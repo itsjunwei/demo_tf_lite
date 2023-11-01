@@ -15,6 +15,7 @@ import tensorflow as tf
 from keras.losses import binary_crossentropy 
 import pandas as pd
 from keras.losses import Loss, MeanAbsoluteError
+from tqdm import tqdm
 
 def seld_loss(y_true, y_pred):
     """
@@ -74,7 +75,6 @@ def sed_loss(y_true, y_pred):
     sed_pred = y_pred[:, : , :n_classes]
     sed_gt   = y_true[:, : , :n_classes]
 
-    
     sed_loss = binary_crossentropy(y_true=sed_gt,
                                    y_pred=sed_pred,
                                    from_logits=False)
@@ -244,15 +244,12 @@ def get_angular_distance(azimuth_difference):
         between the two azimuth predictions
         
         Inputs
-            azimuth_difference : Absolute difference between two azimuth values
+            azimuth_difference : Absolute difference between two azimuth values in degrees
         
         Returns
             distance : the calculated angular distance between the two points
         """
-        distance = np.cos(azimuth_difference)
-        distance = np.clip(distance, -1 , 1)
-        distance = np.arccos(distance) * 180 / np.pi
-        return distance
+        return 180 - abs(azimuth_difference - 180)
 
 class SELDMetrics(object):
     def __init__(self, 
@@ -283,9 +280,9 @@ class SELDMetrics(object):
         self._Nref = 0
         
         # For DOA metrics
-        self.doa_err = 0 # accumulated doa error for correct SED predictions
-        self._TP_count = 0 # no. of correct SED predictions
-        self._DE_FN = 0 # correct SED predictions but wrong DOA estimate
+        self.doa_err    = 0 # accumulated doa error for correct SED predictions
+        self._TP_count  = 0 # no. of correct SED predictions
+        self._DE_FN     = 0 # correct SED predictions but wrong DOA estimate
 
 
     def update_seld_metrics(self):
@@ -295,12 +292,10 @@ class SELDMetrics(object):
         """
         
         # This is for a dataset created using the .from_generator() function
-        for x_val, y_val in self.val_dataset: 
+        for x_val, y_val in tqdm(self.val_dataset): 
             
             predictions = self.model.predict(x_val, 
-                                             verbose          = 0,
-                                             max_queue_size   = 50,
-                                             workers          = 8)
+                                             verbose = 0)
 
             # Extract the SED values from the single array
             SED_pred = remove_batch_dim(np.array(predictions[:, :, :self.n_classes]))
@@ -332,14 +327,10 @@ class SELDMetrics(object):
             self._FP += loc_FP.sum()
             
             # Class Dependent Localization Error
-            
-            # get DOAs of correct active class predictions
-            correct_cls_doa = np.multiply(TP_sed, np.abs(azi_gt - azi_pred))
-            # get the vectorized function to apply to every value in array
-            vectorized_ang_dist = np.vectorize(get_angular_distance) 
-            self.doa_err += vectorized_ang_dist(correct_cls_doa).sum()
-            # count of correct active class event predictions
-            self._TP_count += TP_sed.sum()
+            correct_cls_doa     = np.multiply(TP_sed, np.abs(azi_gt - azi_pred)) # get DOAs of correct active class predictions
+            vectorized_ang_dist = np.vectorize(get_angular_distance) # get the vectorized function to apply to every value in array
+            self.doa_err    += vectorized_ang_dist(correct_cls_doa).sum()
+            self._TP_count  += TP_sed.sum() # count of correct active class event predictions
             
             # For class-dependent localization F1 score
             FN_doa = np.abs(azi_gt - azi_pred) > self.doa_threshold # outside threshold

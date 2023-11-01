@@ -337,8 +337,9 @@ def bigru_unit(x, add_dense=False):
     """
     
     # To do : check how to merge the final bigru
-    bigru1 = Bidirectional(GRU(units=256, dropout=0.3, return_sequences=True, name="GRU1"), name="BiGRU1")(x)
-    bigru2 = Bidirectional(GRU(units=256, dropout=0.3, return_sequences=True, name="GRU2"), name="BiGRU2")(bigru1)
+    bigru1 = Bidirectional(GRU(units=256, return_sequences=True, name="GRU1"), name="BiGRU1")(x)
+    bigru1 = Dropout(0.3)(bigru1)
+    bigru2 = Bidirectional(GRU(units=256, return_sequences=True, name="GRU2"), name="BiGRU2")(bigru1)
 
     # Unsure about the cost/benefits of adding this layer
     if add_dense : bigru2 = TimeDistributed(Dense(512))(bigru2)
@@ -486,7 +487,7 @@ def get_model(input_shape,
     # placeholder metrics until can settle DCASE SELD metrics
     model.compile(optimizer     = opt,
                   loss          = [sed_loss , doa_loss],
-                  loss_weights  = [0.3, 0.7],
+                  loss_weights  = [0.2, 0.8],
                   metrics       = [sed_loss, doa_loss])
 
     return model
