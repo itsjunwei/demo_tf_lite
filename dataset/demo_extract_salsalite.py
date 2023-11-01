@@ -61,21 +61,23 @@ def extract_features(audio_dir,
     fmax_doa = cfg['data']['fmax_doa']
     
     """
-    For SALSA-Lite, fmax_doa = 2kHz, fs = 48kHz, n_fft = 1024
+    For SALSA-Lite, fmax_doa = 4kHz, fs = 48kHz, n_fft = 512, hop = 300
     This results in the following:
         n_bins      = 257
         lower_bin   = 1
         upper_bin   = 42
-        cutoff_bin  = 192 
+        cutoff_bin  = 96 
+        logspecs -> 95 bins total
+        phasespecs -> 41 bins total
     """
     fmax_doa = np.min((fmax_doa, fs // 2))
     n_bins = n_fft // 2 + 1
-    lower_bin = int(np.floor(fmin_doa * n_fft / float(fs)))  # 512: 1; 256: 0
-    upper_bin = int(np.floor(fmax_doa * n_fft / float(fs)))  # 9000Hz: 512: 192, 256: 96
+    lower_bin = int(np.floor(fmin_doa * n_fft / float(fs)))  # 42
+    upper_bin = int(np.floor(fmax_doa * n_fft / float(fs)))  # 1
     lower_bin = np.max((1, lower_bin))
 
     # Cutoff frequency for spectrograms
-    fmax = 9000  # Hz
+    fmax = 9000  # Hz, meant to reduce feature dimensions
     cutoff_bin = int(np.floor(fmax * n_fft / float(fs)))  # 9000 Hz, 512 nfft: cutoff_bin = 192
     assert upper_bin <= cutoff_bin, 'Upper bin for spatial feature is higher than cutoff bin for spectrogram!'
 
@@ -174,8 +176,6 @@ def compute_scaler(feature_dir):
         hf.create_dataset('std', data=feature_std, dtype=np.float32)
 
     print('Features shape: {}'.format(afeature.shape))
-    # print('mean {}: {}'.format(feature_mean.shape, feature_mean))
-    # print('std {}: {}'.format(feature_std.shape, feature_std))
     print('Scaler path: {}'.format(scaler_path))
 
 
@@ -185,7 +185,6 @@ if __name__ == "__main__":
     dname = os.path.dirname(abspath)
     print("Changing directory to : ", dname)
     os.chdir(dname)
-    
     
     classes = ['dog', 'impact', 'speech']
     for cls in classes:

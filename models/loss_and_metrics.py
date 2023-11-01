@@ -235,9 +235,24 @@ def convert_xy_to_azimuth(array,
     y_coords = array[: , n_classes:]
     azimuths = np.arctan2(y_coords, x_coords)
     azimuth_deg = np.degrees(azimuths)
-    azimuth_final = (azimuth_deg + 360) % 360 # Crop the azimuths to be [0, 360)
+    azimuth_final = (azimuth_deg + 180) % 360 - 180 # Crop the azimuths to be [-180, 180)
 
     return azimuth_final    
+
+def get_angular_distance(azimuth_difference):
+        """For an input absolute azimuth difference, returns the angular distance
+        between the two azimuth predictions
+        
+        Inputs
+            azimuth_difference : Absolute difference between two azimuth values
+        
+        Returns
+            distance : the calculated angular distance between the two points
+        """
+        distance = np.cos(azimuth_difference)
+        distance = np.clip(distance, -1 , 1)
+        distance = np.arccos(distance) * 180 / np.pi
+        return distance
 
 class SELDMetrics(object):
     def __init__(self, 
@@ -303,13 +318,13 @@ class SELDMetrics(object):
             TP_sed = np.logical_and(SED_gt == 1, SED_pred == 1)
             # to be considered correct prediction, the DOA difference must be within threshold
             TP_doa = np.abs(azi_gt - azi_pred) < self.doa_threshold 
-            loc_TP = np.logical_and(TP_sed, TP_doa).sum()
+            loc_TP = np.logical_and(TP_sed, TP_doa).sum() # num of correct class + correct DOA
             
             # Update substitution, deletion and insertion errors
             self._S     += np.minimum(loc_FP, loc_FN).sum()
             self._D     += np.maximum(0, loc_FN - loc_FP).sum()
             self._I     += np.maximum(0, loc_FP - loc_FN).sum()
-            self._Nref  += SED_gt.sum() # just getting the total number of estimates
+            self._Nref  += SED_gt.sum() # total number of active classes per batch
             
             # Similarly, update TP, FN and FP 
             self._TP += loc_TP
@@ -317,8 +332,12 @@ class SELDMetrics(object):
             self._FP += loc_FP.sum()
             
             # Class Dependent Localization Error
-            # total doa error for predictions of correct active class events 
-            self.doa_err += np.multiply(TP_sed, np.abs(azi_gt - azi_pred)).sum()
+            
+            # get DOAs of correct active class predictions
+            correct_cls_doa = np.multiply(TP_sed, np.abs(azi_gt - azi_pred))
+            # get the vectorized function to apply to every value in array
+            vectorized_ang_dist = np.vectorize(get_angular_distance) 
+            self.doa_err += vectorized_ang_dist(correct_cls_doa).sum()
             # count of correct active class event predictions
             self._TP_count += TP_sed.sum()
             

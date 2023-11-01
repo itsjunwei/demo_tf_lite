@@ -36,10 +36,8 @@ def load_file(filepath):
     hf = h5py.File(filepath, 'r')
     features = hf['feature'][:] # features --> n_channels , n_timebins, n_freqbins (7,17,191)
 
-    
-    # After downsampling 16x, should result in only one label per input
-    assert len(features[0])//16 == 1, "Please check SALSA-Lite feature size -->{}".format(features[0].shape)
-    
+    n_frames_out = int(np.floor(len(features[0])//16))
+
     # Converting to one-hot encoding
     class_labels = ['dog',
                     'impact',
@@ -66,6 +64,10 @@ def load_file(filepath):
     # doa : azimuths in radians
     gt_class = gt_class.reshape((1,3))
     gt_doa = gt_doa.reshape((1,6))
+    
+    # Expand it such that it meets the required n_frames output
+    gt_class = np.concatenate([gt_class]*n_frames_out, axis=0)
+    gt_doa   = np.concatenate([gt_doa]*n_frames_out, axis=0)
     return features , gt_class , gt_doa
 
 
@@ -98,6 +100,10 @@ def create_dataset():
                 salsa_features , cls_label, doa_label = load_file(filepath=full_filepath)
                 salsa_features[:4] = (salsa_features[:4]-mean)/std
                 data.append(salsa_features)
+                
+                # Because the n_frames_out per input may not be 1, need to find a way to calculate
+                # number of ground truth frames needed per input. For now, hardcoded
+                # TO-DO
                 class_labels.append(cls_label)
                 doa_labels.append(doa_label)
                 
