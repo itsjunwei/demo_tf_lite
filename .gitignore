@@ -8,6 +8,7 @@ __pycache__/
 
 # generated data files
 data/
+legacy/
 features/
 features_upvolume/
 outputs/

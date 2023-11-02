@@ -28,7 +28,7 @@ abspath = os.path.abspath(__file__)
 dname = os.path.dirname(abspath)
 print("Changing directory to : ", dname)
 os.chdir(dname)
-# Clearing the memory seems to improving training speed
+# Clearing the memory seems to improve training speed
 gc.collect()
 tf.keras.backend.clear_session()
 
@@ -175,7 +175,7 @@ for epoch_count in range(total_epochs):
                                            initial_epoch    = epoch_count,
                                            validation_data  = validation_dataset,
                                            callbacks        = callbacks_list,
-                                           verbose          = 1)
+                                           verbose          = 2)
     
     seld_metrics = SELDMetrics(model        = salsa_lite_model,
                                val_dataset  = validation_dataset,

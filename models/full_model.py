@@ -2,10 +2,8 @@ from keras.layers import Input, Conv2D, BatchNormalization, Activation
 from keras.layers import DepthwiseConv2D, AveragePooling2D, Dropout, GRU, Bidirectional, TimeDistributed, Concatenate
 from keras.layers import Add, ReLU, Dense
 from keras import backend, Model
-from keras.metrics import MeanAbsoluteError
 import tensorflow as tf
 from loss_and_metrics import *
-from model_utils import * 
 
 
 """
@@ -451,10 +449,10 @@ def get_model(input_shape,
     """
     
     # Create input of salsa-lite features
-    inputs = Input(shape=input_shape,
-                   batch_size=batch_size,
-                   name = "salsa_lite_features", 
-                   sparse=False)
+    inputs = Input(shape      = input_shape,
+                   batch_size = batch_size,
+                   name       = "salsa_lite_features", 
+                   sparse     = False)
     
     # Initial 2 x conv blocks for input
     input = conv_block(inputs, 64)
@@ -476,19 +474,14 @@ def get_model(input_shape,
     single_array_output = Concatenate(name="final_output")([event_frame_pred, doa_output])
 
     # Create model 
-    model = Model(inputs=inputs,
-                  outputs=single_array_output, 
-                  name='SALSA_model_test')
-    
-    # To do : figure out how to configure optimizers
-    opt = tf.keras.optimizers.Adam()
+    model = Model(inputs  = inputs,
+                  outputs = single_array_output, 
+                  name    = 'SALSA_model_test')
 
-    # To do : custom metrics, loss 
-    # placeholder metrics until can settle DCASE SELD metrics
-    model.compile(optimizer     = opt,
-                  loss          = [sed_loss , doa_loss],
-                  loss_weights  = [0.2, 0.8],
-                  metrics       = [sed_loss, doa_loss])
+    model.compile(optimizer    = tf.keras.optimizers.Adam(learning_rate = 3e-4),
+                  loss         = [sed_loss , doa_loss],
+                  loss_weights = [0.2, 0.8],
+                  metrics      = [sed_loss, doa_loss])
 
     return model
 
@@ -496,7 +489,7 @@ def get_model(input_shape,
 if __name__ == "__main__":
 
     # Simulate one full minute input for testing
-    input_size = (7, 17, 191)
+    input_size = (7, 33, 96)
 
     # Generate input, output pointers
     # use one of basic , bottleneck , dsc for resnet_style
