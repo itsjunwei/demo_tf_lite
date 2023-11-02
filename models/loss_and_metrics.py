@@ -14,8 +14,9 @@ import numpy as np
 import tensorflow as tf
 from keras.losses import binary_crossentropy 
 import pandas as pd
-from keras.losses import Loss, MeanAbsoluteError
 from tqdm import tqdm
+import os
+import math
 
 def seld_loss(y_true, y_pred):
     """
@@ -232,7 +233,7 @@ def convert_xy_to_azimuth(array,
                        manually set n_classes if it is incorrect.
                        
     Returns:
-        azimuth_final : (np.ndarray) Array of azimuths in the range [-180, 180)"""
+        azimuth_deg : (np.ndarray) Array of azimuths in the range [-180, 180)"""
         
     if not array.shape[-1] == 2*n_classes:
         print("Check  ", array.shape)
@@ -243,9 +244,9 @@ def convert_xy_to_azimuth(array,
     y_coords = array[: , n_classes:]
     azimuths = np.arctan2(y_coords, x_coords)
     azimuth_deg = np.degrees(azimuths)
-    azimuth_final = (azimuth_deg + 180) % 360 - 180 # Crop the azimuths to be [-180, 180)
+    azimuth_deg[azimuth_deg >= 180] -= 360 # Crop the azimuths to be [-180, 180)
 
-    return azimuth_final    
+    return azimuth_deg    
 
 def get_angular_distance(azimuth_difference):
         """For an input absolute azimuth difference, returns the angular distance
@@ -300,7 +301,7 @@ class SELDMetrics(object):
         It will cycle through the dataset generator, compute predictions for each batch
         and update the SELD scores. 
         """
-        
+        csv_metrics = []
         # This is for a dataset created using the .from_generator() function
         for x_val, y_val in tqdm(self.val_dataset, total = self.n_val_iter): 
             
@@ -310,13 +311,21 @@ class SELDMetrics(object):
             # Extract the SED values from the single array
             SED_pred = remove_batch_dim(np.array(predictions[:, :, :self.n_classes]))
             SED_gt   = remove_batch_dim(np.array(y_val[:, :, :self.n_classes])) 
-            # If the probability exceeds the threshold --> considered active
+            # If the probability exceeds the threshold --> considered active (set to 1, else 0)
             SED_pred = (SED_pred > self.sed_threshold).astype(int)
-            
+                         
             # Extract the DOA values (X,Y) and convert them into azimuth
             azi_gt   = convert_xy_to_azimuth(remove_batch_dim(np.array(y_val[:, : , self.n_classes:])), n_classes = self.n_classes)
             azi_pred = convert_xy_to_azimuth(remove_batch_dim(np.array(predictions[:, : , self.n_classes:])), n_classes = self.n_classes)
 
+            for i in range(len(SED_pred)):
+                output = np.concatenate([SED_pred[i], 
+                                         SED_gt[i],
+                                         azi_pred[i],
+                                         azi_gt[i]],
+                                        axis = -1)
+                csv_metrics.append(output.flatten())
+            
             # compute False Negatives (FN), False Positives (FP) and True Positives (TP)
             loc_FN = np.logical_and(SED_gt == 1, SED_pred == 0).sum(1)
             loc_FP = np.logical_and(SED_gt == 0, SED_pred == 1).sum(1)
@@ -342,11 +351,14 @@ class SELDMetrics(object):
             self.doa_err    += vectorized_ang_dist(correct_cls_doa).sum()
             self._TP_count  += TP_sed.sum() # count of correct active class event predictions
             
-            # For class-dependent localization F1 score
+            # For class-dependent localization recall
             FN_doa = np.abs(azi_gt - azi_pred) > self.doa_threshold # azimuth diff is outside threshold
             loc_FN = np.logical_and(TP_sed, FN_doa).sum() # num of correct SED, wrong DOA
             self._DE_FN += loc_FN # total count of correct SED, wrong DOA
-
+        df = pd.DataFrame(csv_metrics)
+        os.makedirs('./temp_metrics', exist_ok = True)
+        df.to_csv('./temp_metrics/temp_data.csv', index=False, header=False)
+        
     def calculate_seld_metrics(self):
         """Generate the SELD metrics from the calculated values
         Differs from the code provided by DCASE as this is demo-specific
@@ -355,7 +367,7 @@ class SELDMetrics(object):
             _ER     : (float) Error Rate
             _F1     : (float) F1 Score
             LE_CD   : (float) Localization Error
-            LE_F1   : (float) Localization F1 Score 
+            LR_CD   : (float) Localization Recall 
         """
         eps = np.finfo(np.float).eps
         
@@ -368,7 +380,67 @@ class SELDMetrics(object):
         # LE_CD (class dependent localization error)
         LE_CD = self.doa_err / self._TP_count
         
-        # LE_F1 (class dependent F1 score)
-        LE_F1 = self._TP_count / (eps + self._TP_count + self._DE_FN)
+        # LE_F1 (class dependent localization recall)
+        LR_CD = self._TP_count / (eps + self._TP_count + self._DE_FN)
 
-        return _ER, _F1, LE_CD, LE_F1
+        return _ER, _F1, LE_CD, LR_CD
+    
+    def calc_csv_metrics(self):
+        
+        # Read the predictions/gt data file
+        data = pd.read_csv('./temp_metrics/temp_data.csv', header=None)
+        
+        # SED predictions (first n_classes) and gt (second n_classes)
+        sed_pred = data.iloc[:, :self.n_classes*2]
+        sed = sed_pred.values
+        # Mask is essentially just see if predictions == ground truth
+        mask = (sed_pred.iloc[: , :self.n_classes].values == sed_pred.iloc[: , self.n_classes:self.n_classes*2].values).all(axis=1)
+        # Number of rows/frames where predictions == ground truth
+        correct_sed = mask.sum()
+        # Raw accuracy for SED
+        sed_accuracy = correct_sed / sed_pred.shape[0]
+        
+        # Extract DOA predictions (n_classes) , ground truths (n_classes)
+        doa = data.iloc[: , self.n_classes*2 : ]
+        doa = doa.values
+        
+        c_sed_c_doa = 0 # Num of correct SED & DOA
+        c_sed_c_doa_total_doa_error = 0 # DOA error for correct SED & DOA
+        lecd_doa_error = 0 # total DOA error for correct SED preds
+        total_S = 0
+        total_D = 0
+        total_I = 0
+        total_Nref = 0
+        sed_FN = 0
+        sed_FP = 0
+        
+        
+        for idx, is_sed in enumerate(mask):
+            sed_p = sed[idx][:self.n_classes]
+            sed_g = sed[idx][self.n_classes:]
+            loc_FN = np.logical_and(sed_g == 1, sed_p == 0).sum()
+            loc_FP = np.logical_and(sed_g == 0, sed_p == 1).sum()
+            total_S += np.minimum(loc_FP, loc_FN).sum()
+            total_D += np.maximum(0, loc_FN - loc_FP).sum()
+            total_I += np.maximum(0, loc_FP - loc_FN).sum()
+            total_Nref += sed_g.sum()
+            sed_FP += loc_FP.sum()
+            sed_FN += loc_FN.sum()
+            if is_sed: 
+                for class_idx, one_hot_class in enumerate(sed_pred[idx]):
+                    if one_hot_class != 0:
+                        doa_diff = np.abs(doa[idx][class_idx] - doa[idx][class_idx + self.n_classes])
+                        lecd_doa_error += doa_diff
+                        if doa_diff <= self.doa_threshold:
+                            c_sed_c_doa += 1
+                            c_sed_c_doa_total_doa_error += doa_diff
+                            
+        error_rate = (total_S + total_D + total_I) / (total_Nref)
+        f_score    = c_sed_c_doa / (c_sed_c_doa + 0.5 * (sed_FN + sed_FP))
+        le_cd      = lecd_doa_error / correct_sed
+        lr_cd      = c_sed_c_doa/total_Nref
+        seld_error = 0.25 * (error_rate + (1-f_score) + le_cd/180 + (1-lr_cd))
+        print("Raw Accuracy : {:.4f}".format(sed_accuracy))
+        print("SELD Error : {:.3f} , ER : {:.3f} , F1 : {:.3f}, LE : {:.3f}, LR : {:.3f}\n".format(seld_error, error_rate, f_score, le_cd, lr_cd))
+     
+        
