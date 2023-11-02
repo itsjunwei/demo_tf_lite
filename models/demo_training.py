@@ -13,9 +13,10 @@ from loss_and_metrics import *
 from full_model import * 
 import pandas as pd
 import os 
+import gc
 import tensorflow as tf
 import logging
-from keras.callbacks import ModelCheckpoint, EarlyStopping, LearningRateScheduler, CSVLogger, TensorBoard
+from keras.callbacks import ModelCheckpoint, EarlyStopping, LearningRateScheduler, CSVLogger, TensorBoard, Callback
 
 # Ensure that script working directory is same directory as the script
 os.system('cls')
@@ -24,6 +25,8 @@ abspath = os.path.abspath(__file__)
 dname = os.path.dirname(abspath)
 print("Changing directory to : ", dname)
 os.chdir(dname)
+gc.collect()
+tf.keras.backend.clear_session()
 
 # Global model settings, put into configs / .yml file eventually
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
@@ -120,7 +123,7 @@ checkpoint = ModelCheckpoint("../experiments/salsalite_demo_{epoch:03d}_loss_{lo
 
 early = EarlyStopping(monitor="val_loss",
                       mode="min",
-                      patience=10)
+                      patience=5)
 
 def scheduler(epoch, lr):
     if epoch < 35:
@@ -136,8 +139,8 @@ csv_logger = CSVLogger(filename = '../experiments/training_demo.csv', append=Fal
 
 tensorboard_callback = TensorBoard(log_dir='../experiments/logs', histogram_freq=1)
 
-# callbacks_list = [checkpoint, early, tensorboard_callback, csv_logger, schedule]
-callbacks_list = [tensorboard_callback, csv_logger, schedule]
+callbacks_list = [checkpoint, early, tensorboard_callback, csv_logger, schedule]
+# callbacks_list = [tensorboard_callback, csv_logger, schedule]
 
 # Checking if GPU is being used
 print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
@@ -157,7 +160,7 @@ TODO
       minimum SELD_Error
     - Fix batch size limitation (GRU layer)
 """
-total_epochs = 2
+total_epochs = 5
 train_stats = []
 for epoch_count in range(total_epochs):
     
@@ -166,7 +169,7 @@ for epoch_count in range(total_epochs):
                                            initial_epoch    = epoch_count,
                                            validation_data  = validation_dataset,
                                            callbacks        = callbacks_list,
-                                           verbose          = 2)
+                                           verbose          = 1)
     
     seld_metrics = SELDMetrics(model        = salsa_lite_model,
                                val_dataset  = validation_dataset,
@@ -200,6 +203,7 @@ if is_inference:
             csv_data.append(output.flatten())
             
     df = pd.DataFrame(csv_data)
+    os.makedirs("../experiements/outputs", exist_ok = True)
     df.to_csv('../experiments/outputs/test_data.csv', index=False, header=False)
 else:
     print("Done!")

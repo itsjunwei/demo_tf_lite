@@ -128,9 +128,11 @@ def masked_reg_loss_azimuth(event_frame_gt, doa_frame_gt, doa_frame_output, n_cl
     
     return azi_loss
 
-def compute_masked_reg_loss(input, target, mask):
+def compute_masked_reg_loss(input, target, mask, loss_type = "MAE"):
     """
-    Compute masked mean loss. Currently, only masked mean absolute error is implemented
+    Compute masked regression loss. 
+    MAE - mean absolute error (MAE is better for SMN)
+    MSE - mean squared error
     
     Inputs:
         note that all inputs are of shape (batch_size, n_timesteps, n_classes)
@@ -155,8 +157,13 @@ def compute_masked_reg_loss(input, target, mask):
     # ______________________________
     # sum{          mask           }
 
-    reg_loss = tf.keras.backend.sum(tf.keras.backend.abs(input-target)*mask)/tf.keras.backend.sum(mask)
-    
+    if loss_type == "MAE":
+        reg_loss = tf.reduce_sum(tf.keras.backend.abs(input-target)*mask) / tf.reduce_sum(mask)
+    elif loss_type == "MSE":
+        reg_loss = tf.reduce_sum((input - target) ** 2 * mask) / tf.reduce_sum(mask)
+    else:
+        raise ValueError('Unknown reg loss type: {}'.format(loss_type))
+
     return reg_loss
 
 # not used
@@ -224,7 +231,7 @@ def convert_xy_to_azimuth(array,
                        manually set n_classes if it is incorrect.
                        
     Returns:
-        azimuth_final : (np.ndarray) Array of azimuths"""
+        azimuth_final : (np.ndarray) Array of azimuths in the range [-180, 180)"""
         
     if not array.shape[-1] == 2*n_classes:
         print("Check  ", array.shape)
@@ -292,7 +299,7 @@ class SELDMetrics(object):
         """
         
         # This is for a dataset created using the .from_generator() function
-        for x_val, y_val in tqdm(self.val_dataset): 
+        for x_val, y_val in tqdm(self.val_dataset, total=700): 
             
             predictions = self.model.predict(x_val, 
                                              verbose = 0)

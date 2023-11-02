@@ -54,6 +54,13 @@ def load_file(filepath):
     
     # Converting Azimuth into radians and assigning to active class
     gt_azi = int(gts[1])
+    # Convert the azimuth from [0, 360) to [-180, 180)
+    if gt_azi == 330:
+        gt_azi = -30
+    elif gt_azi == 270:
+        gt_azi = -90
+    elif gt_azi == 210:
+        gt_azi = -150
     gt_doa = np.zeros(len(class_labels)*2, dtype=np.float32)
     azi_rad = np.deg2rad(gt_azi)
     gt_doa[class_idx] = np.cos(azi_rad)
