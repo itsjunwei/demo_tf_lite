@@ -46,6 +46,15 @@ def load_file(filepath):
     # Extract ground truth from the filename
     filename = filepath.split(os.sep)[-1] # filename  =  class_azimuth_idx.h5
     gts = filename.split('_') # [class, azimuth, ... ]
+    
+    if gts[0] == "noise":
+        gt_class = np.zeros(len(class_labels), dtype=np.float32)
+        gt_doa   = np.zeros(len(class_labels)*2, dtype=np.float32)
+        gt_class = gt_class.reshape((1,3))
+        gt_doa = gt_doa.reshape((1,6))
+        gt_class = np.concatenate([gt_class]*n_frames_out, axis=0)
+        gt_doa   = np.concatenate([gt_doa]*n_frames_out, axis=0)
+        return features , gt_class , gt_doa
 
     # One-hot class encoding
     class_idx = class_labels.index(gts[0])
@@ -89,7 +98,7 @@ def create_dataset():
     data = []
     class_labels = []
     doa_labels = []
-    classes = ['dog', 'impact', 'speech']
+    classes = ['dog', 'impact', 'speech', 'noise']
     for cls in classes:
         feature_dir = '../dataset/features/{}'.format(cls)
         
@@ -127,7 +136,7 @@ if __name__ == "__main__":
     
     # Create arrays for feature, ground truth labels dataset
     d , sed, doa = create_dataset()
-    
+
     # Create directories for storage
     os.makedirs('../dataset/demo_dataset/', exist_ok=True)
     try:

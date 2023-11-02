@@ -186,7 +186,8 @@ if __name__ == "__main__":
     print("Changing directory to : ", dname)
     os.chdir(dname)
     
-    classes = ['dog', 'impact', 'speech']
+    # classes = ['dog', 'impact', 'speech']
+    classes = ['noise']
     for cls in classes:
         
         audio_dir = './cleaned_data/{}'.format(cls)

@@ -149,7 +149,8 @@ def compute_masked_reg_loss(input, target, mask, loss_type = "MAE"):
     input = input[:, 0: N, :]
     target = target[:, 0: N, :]
     mask = mask[:, 0: N, :]
-
+    normalize_value = tf.reduce_sum(mask)
+    eps = np.finfo(np.float).eps
     # we use keras backend functions to do math
     
     # Formula:
@@ -158,9 +159,9 @@ def compute_masked_reg_loss(input, target, mask, loss_type = "MAE"):
     # sum{          mask           }
 
     if loss_type == "MAE":
-        reg_loss = tf.reduce_sum(tf.keras.backend.abs(input-target)*mask) / tf.reduce_sum(mask)
+        reg_loss = tf.reduce_sum(tf.keras.backend.abs(input-target)*mask) / (normalize_value + eps)
     elif loss_type == "MSE":
-        reg_loss = tf.reduce_sum((input - target) ** 2 * mask) / tf.reduce_sum(mask)
+        reg_loss = tf.reduce_sum((input - target) ** 2 * mask) / (normalize_value + eps)
     else:
         raise ValueError('Unknown reg loss type: {}'.format(loss_type))
 
@@ -265,7 +266,8 @@ class SELDMetrics(object):
                  epoch_count, 
                  doa_threshold = 20, 
                  n_classes = 3,
-                 sed_threshold = 0.3):
+                 sed_threshold = 0.5,
+                 n_val_iter = 1000):
         
         # Define self variables 
         self.model = model
@@ -274,6 +276,7 @@ class SELDMetrics(object):
         self.n_classes = n_classes
         self.doa_threshold = doa_threshold
         self.sed_threshold = sed_threshold
+        self.n_val_iter = n_val_iter
         
         # For SED metrics (F1 score)
         self._TP = 0
@@ -299,7 +302,7 @@ class SELDMetrics(object):
         """
         
         # This is for a dataset created using the .from_generator() function
-        for x_val, y_val in tqdm(self.val_dataset, total=700): 
+        for x_val, y_val in tqdm(self.val_dataset, total = self.n_val_iter): 
             
             predictions = self.model.predict(x_val, 
                                              verbose = 0)
@@ -311,8 +314,8 @@ class SELDMetrics(object):
             SED_pred = (SED_pred > self.sed_threshold).astype(int)
             
             # Extract the DOA values (X,Y) and convert them into azimuth
-            azi_gt   = convert_xy_to_azimuth(remove_batch_dim(np.array(y_val[:, : , self.n_classes:])))
-            azi_pred = convert_xy_to_azimuth(remove_batch_dim(np.array(predictions[:, : , self.n_classes:])))
+            azi_gt   = convert_xy_to_azimuth(remove_batch_dim(np.array(y_val[:, : , self.n_classes:])), n_classes = self.n_classes)
+            azi_pred = convert_xy_to_azimuth(remove_batch_dim(np.array(predictions[:, : , self.n_classes:])), n_classes = self.n_classes)
 
             # compute False Negatives (FN), False Positives (FP) and True Positives (TP)
             loc_FN = np.logical_and(SED_gt == 1, SED_pred == 0).sum(1)
@@ -340,8 +343,8 @@ class SELDMetrics(object):
             self._TP_count  += TP_sed.sum() # count of correct active class event predictions
             
             # For class-dependent localization F1 score
-            FN_doa = np.abs(azi_gt - azi_pred) > self.doa_threshold # outside threshold
-            loc_FN = np.logical_and(TP_sed, FN_doa).sum() # correct SED, wrong DOA
+            FN_doa = np.abs(azi_gt - azi_pred) > self.doa_threshold # azimuth diff is outside threshold
+            loc_FN = np.logical_and(TP_sed, FN_doa).sum() # num of correct SED, wrong DOA
             self._DE_FN += loc_FN # total count of correct SED, wrong DOA
 
     def calculate_seld_metrics(self):

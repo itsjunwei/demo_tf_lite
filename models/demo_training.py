@@ -17,6 +17,9 @@ import gc
 import tensorflow as tf
 import logging
 from keras.callbacks import ModelCheckpoint, EarlyStopping, LearningRateScheduler, CSVLogger, TensorBoard, Callback
+from datetime import datetime
+now = datetime.now()
+now = now.strftime("%Y%m%d_%H%M")
 
 # Ensure that script working directory is same directory as the script
 os.system('cls')
@@ -25,6 +28,7 @@ abspath = os.path.abspath(__file__)
 dname = os.path.dirname(abspath)
 print("Changing directory to : ", dname)
 os.chdir(dname)
+# Clearing the memory seems to improving training speed
 gc.collect()
 tf.keras.backend.clear_session()
 
@@ -72,7 +76,7 @@ val_size   = int(dataset_split[1] * dataset_size)
 test_size  = int(dataset_split[2] * dataset_size)
 
 # Shuffle the dataset before splitting
-shuffled_dataset = dataset.shuffle(dataset_size)
+shuffled_dataset = dataset.cache().shuffle(dataset_size)
 
 # Create the training dataset
 train_dataset       = shuffled_dataset.take(train_size)
@@ -99,11 +103,11 @@ test_dataset = test_dataset.prefetch(tf.data.AUTOTUNE)
 # Get input size of one input 
 total_samples = len(feature_dataset)
 input_shape = feature_dataset[0].shape
-print("Train size   : ", train_size)
-print("Val size     : ", val_size)
-print("Test size    : ", test_size)
-print("Batch size   : ", batch_size)
-print("Input shape  : ", input_shape)
+print("Train size  : ", train_size)
+print("Val size    : ", val_size)
+print("Test size   : ", test_size)
+print("Batch size  : ", batch_size)
+print("Input shape : ", input_shape)
 
 # Get the salsa-lite model
 salsa_lite_model = get_model(input_shape    = input_shape, 
@@ -135,9 +139,11 @@ def scheduler(epoch, lr):
 
 schedule = LearningRateScheduler(scheduler)
 
-csv_logger = CSVLogger(filename = '../experiments/training_demo.csv', append=False)
+csv_logger = CSVLogger(filename = '../experiments/{}/training_demo.csv'.format(now), 
+                       append=False)
 
-tensorboard_callback = TensorBoard(log_dir='../experiments/logs', histogram_freq=1)
+tensorboard_callback = TensorBoard(log_dir='../experiments/{}/logs'.format(now), 
+                                   histogram_freq=1)
 
 callbacks_list = [checkpoint, early, tensorboard_callback, csv_logger, schedule]
 # callbacks_list = [tensorboard_callback, csv_logger, schedule]
@@ -160,7 +166,7 @@ TODO
       minimum SELD_Error
     - Fix batch size limitation (GRU layer)
 """
-total_epochs = 5
+total_epochs = 10
 train_stats = []
 for epoch_count in range(total_epochs):
     
@@ -174,7 +180,8 @@ for epoch_count in range(total_epochs):
     seld_metrics = SELDMetrics(model        = salsa_lite_model,
                                val_dataset  = validation_dataset,
                                epoch_count  = epoch_count,
-                               n_classes    = n_classes)
+                               n_classes    = n_classes,
+                               n_val_iter   = int(val_size//batch_size))
     
     seld_metrics.update_seld_metrics()
     er_sed , sed_F1 , loc_err , loc_F1 = seld_metrics.calculate_seld_metrics()
@@ -182,8 +189,10 @@ for epoch_count in range(total_epochs):
     train_stats.append([seld_err, er_sed, sed_F1, loc_err, loc_F1])
     print("SELD Error : {:.3f} , ER : {:.3f} , F1 : {:.3f}, LE : {:.3f}, LR : {:.3f}".format(seld_err, er_sed, sed_F1, loc_err, loc_F1))
 
-salsa_lite_model.save_weights('../experiments/model_last.h5')
-np.save('../experiments/demo_model_hist.npy', salsa_lite_model.history, allow_pickle=True)
+salsa_lite_model.save_weights('../experiments/{}/model_last.h5'.format(now))
+np.save('../experiments/{}/demo_model_hist.npy'.format(now), 
+        salsa_lite_model.history, 
+        allow_pickle=True)
 
 is_inference = True
 if is_inference: 
@@ -203,7 +212,7 @@ if is_inference:
             csv_data.append(output.flatten())
             
     df = pd.DataFrame(csv_data)
-    os.makedirs("../experiements/outputs", exist_ok = True)
-    df.to_csv('../experiments/outputs/test_data.csv', index=False, header=False)
+    os.makedirs("../experiments/{}/outputs".format(now), exist_ok = True)
+    df.to_csv('../experiments/{}/outputs/test_data.csv'.format(now), index=False, header=False)
 else:
     print("Done!")
