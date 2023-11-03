@@ -181,7 +181,7 @@ for epoch_count in range(total_epochs):
                                n_classes    = n_classes,
                                n_val_iter   = int(val_size//batch_size))
     
-    seld_metrics.update_seld_metrics()
+    # seld_metrics.update_seld_metrics()
     # er_sed , sed_F1 , loc_err , loc_recall = seld_metrics.calculate_seld_metrics()
     # seld_err = 0.25 * (er_sed + (1 - sed_F1) + (loc_err/180) + (1-loc_recall))
     # train_stats.append([epoch_count+1, seld_err, er_sed, sed_F1, loc_err, loc_recall])
