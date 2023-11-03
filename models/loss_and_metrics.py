@@ -385,10 +385,17 @@ class SELDMetrics(object):
 
         return _ER, _F1, LE_CD, LR_CD
     
-    def calc_csv_metrics(self):
+    def calc_csv_metrics(self, filepath='./temp_metrics/temp_data.csv'):
+        """Generate SELD Metrics from the predictions / ground truth that is stored in
+        csv format when calling the `update_seld_metrics()` function. Need to call this
+        function before using calc_csv_metrics(). 
+        
+        Differs from the `calculate_seld_metrics()` function in the sense that this uses
+        csv, pandas and numpy arrays to calculate. It should be more accurate since do not 
+        need to manipulate Tensors (unsure). The values will differ (also unsure why)"""
 
         # Read the predictions/gt data file
-        data = pd.read_csv('./temp_metrics/temp_data.csv', header=None)
+        data = pd.read_csv(filepath, header=None)
 
         # SED predictions (first n_classes) and gt (second n_classes)
         sed_pred = data.iloc[:, :self.n_classes*2]
@@ -415,16 +422,16 @@ class SELDMetrics(object):
         sed_FP = 0 # Total SED False Positives
 
         for idx, is_sed in enumerate(mask):
-            sed_p = sed[idx][:self.n_classes]
-            sed_g = sed[idx][self.n_classes:]
-            loc_FN = np.logical_and(sed_g == 1, sed_p == 0).sum()
-            loc_FP = np.logical_and(sed_g == 0, sed_p == 1).sum()
-            total_S += np.minimum(loc_FP, loc_FN).sum()
-            total_D += np.maximum(0, loc_FN - loc_FP).sum()
-            total_I += np.maximum(0, loc_FP - loc_FN).sum()
-            total_Nref += sed_g.sum()
-            sed_FP += loc_FP.sum()
-            sed_FN += loc_FN.sum()
+            sed_p   = sed[idx][:self.n_classes] # SED Prediction for a timeframe
+            sed_g   = sed[idx][self.n_classes:] # SED Ground Truth for that timeframe
+            loc_FN  = np.logical_and(sed_g == 1, sed_p == 0).sum() # False Negatives for the timeframe
+            loc_FP  = np.logical_and(sed_g == 0, sed_p == 1).sum() # False Positives for the timeframe
+            total_S += np.minimum(loc_FP, loc_FN).sum() # Substitution Error
+            total_D += np.maximum(0, loc_FN - loc_FP).sum() # Deletion Error
+            total_I += np.maximum(0, loc_FP - loc_FN).sum() # Insertion Error
+            total_Nref += sed_g.sum() # Num of active classes per timeframe
+            sed_FP  += loc_FP.sum() 
+            sed_FN  += loc_FN.sum()
             if is_sed: # correct SED prediction
                 for class_idx in range(self.n_classes): # loop through the classes
                     if sed_p[class_idx] != 0: # since correct SED prediction (sed_p == 1, sed_g == 1)
@@ -432,16 +439,18 @@ class SELDMetrics(object):
                         while doa_diff < -180 : doa_diff += 360
                         while doa_diff >= 180 : doa_diff -= 360 # adjust to [-180, 180)
                         lecd_doa_error += np.abs(doa_diff) # sum the total DOA errors for correct SED predictions
-                        if doa_diff <= self.doa_threshold:
+                        if doa_diff <= self.doa_threshold: # Correct DOA prediction
                             c_sed_c_doa += 1 # number of correct DOA and SED
                             c_sed_c_doa_total_doa_error += np.abs(doa_diff) # DOA diff total for correct DOA and SED
-                            
-        error_rate = (total_S + total_D + total_I) / (c_sed_c_doa)
+        
+        # SELD Metrics of Error Rate, F-Score, Localization Error and Recall                    
+        error_rate = (total_S + total_D + total_I) / (total_Nref)
         f_score    = c_sed_c_doa / (c_sed_c_doa + 0.5 * (sed_FN + sed_FP))
         le_cd      = lecd_doa_error / correct_sed
         lr_cd      = c_sed_c_doa/total_Nref
         seld_error = 0.25 * (error_rate + (1-f_score) + le_cd/180 + (1-lr_cd))
+        # Raw Accuracy --> Ignore DOA Threshold
         print("Raw Accuracy : {:.4f}, DOA Error for Correct Preds : {:.4f}".format(sed_accuracy, (c_sed_c_doa_total_doa_error/c_sed_c_doa)))
-        print("SELD Error : {:.3f} , ER : {:.3f} , F1 : {:.3f}, LE : {:.3f}, LR : {:.3f}\n".format(seld_error, error_rate, f_score, le_cd, lr_cd))
-     
+        print("SELD Error : {:.4f} , ER : {:.4f} , F1 : {:.4f}, LE : {:.4f}, LR : {:.4f}\n".format(seld_error, error_rate, f_score, le_cd, lr_cd))
+        return seld_error, error_rate, f_score, le_cd, lr_cd
         

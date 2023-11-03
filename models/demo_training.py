@@ -162,8 +162,6 @@ infinitely (we want it to run once per epoch). So in this case, we do not specif
 The first epoch will show xxx/unknown for the progress bar (if verbose = 1) and that is fine. 
 
 TODO
-    - Implement tracking metrics if do not wish to use EarlyStopping on `val_loss`, SALSA-Lite used
-      minimum SELD_Error
     - Fix batch size limitation (GRU layer)
 """
 total_epochs = 10
@@ -184,28 +182,38 @@ for epoch_count in range(total_epochs):
                                n_val_iter   = int(val_size//batch_size))
     
     seld_metrics.update_seld_metrics()
-    er_sed , sed_F1 , loc_err , loc_recall = seld_metrics.calculate_seld_metrics()
-    seld_err = 0.25 * (er_sed + (1 - sed_F1) + (loc_err/180) + (1-loc_recall))
-    train_stats.append([epoch_count+1, seld_err, er_sed, sed_F1, loc_err, loc_recall])
-    print("SELD Error : {:.3f} , ER : {:.3f} , F1 : {:.3f}, LE : {:.3f}, LR : {:.3f}\n".format(seld_err, er_sed, sed_F1, loc_err, loc_recall))
-    seld_metrics.calc_csv_metrics()
+    # er_sed , sed_F1 , loc_err , loc_recall = seld_metrics.calculate_seld_metrics()
+    # seld_err = 0.25 * (er_sed + (1 - sed_F1) + (loc_err/180) + (1-loc_recall))
+    # train_stats.append([epoch_count+1, seld_err, er_sed, sed_F1, loc_err, loc_recall])
+    # print("SELD Error : {:.3f} , ER : {:.3f} , F1 : {:.3f}, LE : {:.3f}, LR : {:.3f}\n".format(seld_err, er_sed, sed_F1, loc_err, loc_recall))
+    seld_error, error_rate, f_score, le_cd, lr_cd = seld_metrics.calc_csv_metrics()
+    train_stats.append([epoch_count + 1, seld_error, error_rate, f_score, le_cd, lr_cd])
+    
+    # Check if lowest SELD Error
+    min_SELD_error_array = min(train_stats, key = lambda x : x[1])
+    if min_SELD_error_array[0] == epoch_count+1 : # Save the epoch model with lowest SELD Error
+        best_performing_epoch_path = "../experiments/{}/best_model_epoch_{}_seld_{}.h5".format(now, min_SELD_error_array[0], min_SELD_error_array[1])
+        print("\nBest performing epoch : {}, SELD Error : {:.4f}".format(min_SELD_error_array[0], min_SELD_error_array[1]))
+        salsa_lite_model.save_weights(best_performing_epoch_path)
 
 # TODO 
 # Include way to save best performing model based off of SELD metrics    
 min_SELD_error_array = min(train_stats, key = lambda x : x[1])
 print("\nBest performing epoch : {}, SELD Error : {:.4f}".format(min_SELD_error_array[0], min_SELD_error_array[1]))
 
-
+# Currently saving the last epoch model
 salsa_lite_model.save_weights('../experiments/{}/model_last.h5'.format(now))
 np.save('../experiments/{}/demo_model_hist.npy'.format(now), 
         salsa_lite_model.history, 
         allow_pickle=True)
 
+# TODO
 is_inference = True
 if is_inference: 
     print("\n\nInfering on test set now...")
     # Inference Section on Test Set
     csv_data = []
+    salsa_lite_model.load_weights(best_performing_epoch_path)
     for x_test, y_test in tqdm(test_dataset, total = int(test_size//batch_size)):
         test_predictions = salsa_lite_model.predict(x_test, verbose = 0)
         SED_pred = remove_batch_dim(np.array(test_predictions[:, :, :n_classes]))
@@ -220,7 +228,9 @@ if is_inference:
             csv_data.append(output.flatten())
             
     df = pd.DataFrame(csv_data)
+    inference_csv_filepath = '../experiments/{}/outputs/test_data.csv'.format(now)
     os.makedirs("../experiments/{}/outputs".format(now), exist_ok = True)
-    df.to_csv('../experiments/{}/outputs/test_data.csv'.format(now), index=False, header=False)
+    df.to_csv(inference_csv_filepath, index=False, header=False)
+    seld_metrics.calc_csv_metrics(filepath = inference_csv_filepath)
 else:
     print("Done!")
