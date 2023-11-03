@@ -393,9 +393,32 @@ class SELDMetrics(object):
         Differs from the `calculate_seld_metrics()` function in the sense that this uses
         csv, pandas and numpy arrays to calculate. It should be more accurate since do not 
         need to manipulate Tensors (unsure). The values will differ (also unsure why)"""
+        csv_metrics = []
+        # This is for a dataset created using the .from_generator() function
+        for x_val, y_val in tqdm(self.val_dataset, total = self.n_val_iter): 
+            
+            predictions = self.model.predict(x_val, 
+                                             verbose = 0)
+            
+            # Extract the SED values from the single array
+            SED_pred = remove_batch_dim(np.array(predictions[:, :, :self.n_classes]))
+            SED_gt   = remove_batch_dim(np.array(y_val[:, :, :self.n_classes])) 
+            # If the probability exceeds the threshold --> considered active (set to 1, else 0)
+            SED_pred = (SED_pred > self.sed_threshold).astype(int)
+                         
+            # Extract the DOA values (X,Y) and convert them into azimuth
+            azi_gt   = convert_xy_to_azimuth(remove_batch_dim(np.array(y_val[:, : , self.n_classes:])), n_classes = self.n_classes)
+            azi_pred = convert_xy_to_azimuth(remove_batch_dim(np.array(predictions[:, : , self.n_classes:])), n_classes = self.n_classes)
 
-        # Read the predictions/gt data file
-        data = pd.read_csv(filepath, header=None)
+            for i in range(len(SED_pred)):
+                output = np.concatenate([SED_pred[i], SED_gt[i], azi_pred[i], azi_gt[i]],
+                                        axis = -1)
+                csv_metrics.append(output.flatten())
+                
+        data = pd.DataFrame(csv_metrics)
+
+        # # Read the predictions/gt data file
+        # data = pd.read_csv(filepath, header=None)
 
         # SED predictions (first n_classes) and gt (second n_classes)
         sed_pred = data.iloc[:, :self.n_classes*2]

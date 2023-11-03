@@ -14,7 +14,7 @@ features_upvolume/
 outputs/
 dataset/data
 dataset/meta
-dataset/cleaned_data
+dataset/cleaned_data*
 dataset/cleaned_data_upvolume
 testing/
 offline/
