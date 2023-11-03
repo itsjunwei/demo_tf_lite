@@ -386,35 +386,34 @@ class SELDMetrics(object):
         return _ER, _F1, LE_CD, LR_CD
     
     def calc_csv_metrics(self):
-        
+
         # Read the predictions/gt data file
         data = pd.read_csv('./temp_metrics/temp_data.csv', header=None)
-        
+
         # SED predictions (first n_classes) and gt (second n_classes)
         sed_pred = data.iloc[:, :self.n_classes*2]
-        sed = sed_pred.values
+        sed = sed_pred.values # convert to np.ndarry
         # Mask is essentially just see if predictions == ground truth
         mask = (sed_pred.iloc[: , :self.n_classes].values == sed_pred.iloc[: , self.n_classes:self.n_classes*2].values).all(axis=1)
         # Number of rows/frames where predictions == ground truth
         correct_sed = mask.sum()
         # Raw accuracy for SED
         sed_accuracy = correct_sed / sed_pred.shape[0]
-        
+
         # Extract DOA predictions (n_classes) , ground truths (n_classes)
         doa = data.iloc[: , self.n_classes*2 : ]
-        doa = doa.values
-        
+        doa = doa.values # convert to np.ndarry
+
         c_sed_c_doa = 0 # Num of correct SED & DOA
         c_sed_c_doa_total_doa_error = 0 # DOA error for correct SED & DOA
         lecd_doa_error = 0 # total DOA error for correct SED preds
-        total_S = 0
-        total_D = 0
-        total_I = 0
-        total_Nref = 0
-        sed_FN = 0
-        sed_FP = 0
-        
-        
+        total_S = 0 # Subtitutions
+        total_D = 0 # Deletions
+        total_I = 0 # Insertions
+        total_Nref = 0 # Total number of frames with active classes
+        sed_FN = 0 # Total SED False Negatives
+        sed_FP = 0 # Total SED False Positives
+
         for idx, is_sed in enumerate(mask):
             sed_p = sed[idx][:self.n_classes]
             sed_g = sed[idx][self.n_classes:]
@@ -426,21 +425,23 @@ class SELDMetrics(object):
             total_Nref += sed_g.sum()
             sed_FP += loc_FP.sum()
             sed_FN += loc_FN.sum()
-            if is_sed: 
-                for class_idx, one_hot_class in enumerate(sed_pred[idx]):
-                    if one_hot_class != 0:
-                        doa_diff = np.abs(doa[idx][class_idx] - doa[idx][class_idx + self.n_classes])
-                        lecd_doa_error += doa_diff
+            if is_sed: # correct SED prediction
+                for class_idx in range(self.n_classes): # loop through the classes
+                    if sed_p[class_idx] != 0: # since correct SED prediction (sed_p == 1, sed_g == 1)
+                        doa_diff = doa[idx][class_idx] - doa[idx][class_idx + self.n_classes] # DOA difference
+                        while doa_diff < -180 : doa_diff += 360
+                        while doa_diff >= 180 : doa_diff -= 360 # adjust to [-180, 180)
+                        lecd_doa_error += np.abs(doa_diff) # sum the total DOA errors for correct SED predictions
                         if doa_diff <= self.doa_threshold:
-                            c_sed_c_doa += 1
-                            c_sed_c_doa_total_doa_error += doa_diff
+                            c_sed_c_doa += 1 # number of correct DOA and SED
+                            c_sed_c_doa_total_doa_error += np.abs(doa_diff) # DOA diff total for correct DOA and SED
                             
-        error_rate = (total_S + total_D + total_I) / (total_Nref)
+        error_rate = (total_S + total_D + total_I) / (c_sed_c_doa)
         f_score    = c_sed_c_doa / (c_sed_c_doa + 0.5 * (sed_FN + sed_FP))
         le_cd      = lecd_doa_error / correct_sed
         lr_cd      = c_sed_c_doa/total_Nref
         seld_error = 0.25 * (error_rate + (1-f_score) + le_cd/180 + (1-lr_cd))
-        print("Raw Accuracy : {:.4f}".format(sed_accuracy))
+        print("Raw Accuracy : {:.4f}, DOA Error for Correct Preds : {:.4f}".format(sed_accuracy, (c_sed_c_doa_total_doa_error/c_sed_c_doa)))
         print("SELD Error : {:.3f} , ER : {:.3f} , F1 : {:.3f}, LE : {:.3f}, LR : {:.3f}\n".format(seld_error, error_rate, f_score, le_cd, lr_cd))
      
         

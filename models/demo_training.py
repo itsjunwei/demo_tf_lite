@@ -188,10 +188,14 @@ for epoch_count in range(total_epochs):
     seld_err = 0.25 * (er_sed + (1 - sed_F1) + (loc_err/180) + (1-loc_recall))
     train_stats.append([epoch_count+1, seld_err, er_sed, sed_F1, loc_err, loc_recall])
     print("SELD Error : {:.3f} , ER : {:.3f} , F1 : {:.3f}, LE : {:.3f}, LR : {:.3f}\n".format(seld_err, er_sed, sed_F1, loc_err, loc_recall))
-    # seld_metrics.calc_csv_metrics()
-    
+    seld_metrics.calc_csv_metrics()
+
+# TODO 
+# Include way to save best performing model based off of SELD metrics    
 min_SELD_error_array = min(train_stats, key = lambda x : x[1])
 print("\nBest performing epoch : {}, SELD Error : {:.4f}".format(min_SELD_error_array[0], min_SELD_error_array[1]))
+
+
 salsa_lite_model.save_weights('../experiments/{}/model_last.h5'.format(now))
 np.save('../experiments/{}/demo_model_hist.npy'.format(now), 
         salsa_lite_model.history, 
