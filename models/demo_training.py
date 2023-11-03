@@ -36,7 +36,7 @@ tf.keras.backend.clear_session()
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 resnet_style = 'basic'
 n_classes = 3
-batch_size = 32
+batch_size = 32 # fixed because the GRU layer cannot recognise new batch sizes (not sure why)
 dataset_split = [0.6, 0.2, 0.2]
 
 
@@ -44,7 +44,7 @@ dataset_split = [0.6, 0.2, 0.2]
 Dataset loading functions
 """
 # Load dataset
-demo_dataset_dir    = "../dataset/demo_dataset"
+demo_dataset_dir    = "../dataset/demo_dataset_noise"
 feature_data_fp     = os.path.join(demo_dataset_dir, 'demo_salsalite_features.npy')
 class_label_fp      = os.path.join(demo_dataset_dir, 'demo_class_labels.npy')
 doa_label_fp        = os.path.join(demo_dataset_dir, "demo_doa_labels.npy")

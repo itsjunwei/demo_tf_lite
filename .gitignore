@@ -18,7 +18,7 @@ dataset/cleaned_data*
 dataset/cleaned_data_upvolume
 testing/
 offline/
-dataset/demo_dataset
+dataset/demo_dataset*
 logs/
 experiments/
 models/metrics_test.ipynb

@@ -63,7 +63,7 @@ def load_file(filepath):
     
     # Converting Azimuth into radians and assigning to active class
     gt_azi = int(gts[1])
-    # Convert the azimuth from [0, 360) to [-180, 180)
+    # Convert the azimuth from [0, 360) to [-180, 180), taking (0 == 0) and (180 == -180)
     if gt_azi == 330:
         gt_azi = -30
     elif gt_azi == 270:
@@ -77,7 +77,7 @@ def load_file(filepath):
     
     # Ground Truth should be in the form of 
     # class : onehot encoding
-    # doa : azimuths in radians
+    # doa : azimuths in radians but converted to x,y
     gt_class = gt_class.reshape((1,3))
     gt_doa = gt_doa.reshape((1,6))
     
@@ -98,7 +98,7 @@ def create_dataset():
     data = []
     class_labels = []
     doa_labels = []
-    classes = ['dog', 'impact', 'speech', 'noise']
+    classes = ['dog', 'impact', 'speech']
     for cls in classes:
         feature_dir = '../dataset/features/{}'.format(cls)
         
@@ -138,21 +138,17 @@ if __name__ == "__main__":
     d , sed, doa = create_dataset()
 
     # Create directories for storage
-    os.makedirs('../dataset/demo_dataset/', exist_ok=True)
-    try:
-        feature_fp = "../dataset/demo_dataset/demo_salsalite_features.npy"
-        if os.path.exists(feature_fp): os.remove(feature_fp)
-        np.save(feature_fp, d, allow_pickle=True)
-        print("Features saved!")
-        
-        gt_fp = '../dataset/demo_dataset/demo_class_labels.npy'
-        if os.path.exists(gt_fp) : os.remove(gt_fp)
-        np.save(gt_fp, sed, allow_pickle=True)
-        print("Active class ground truth saved!")
-        
-        doa_fp = '../dataset/demo_dataset/demo_doa_labels.npy'
-        if os.path.exists(doa_fp) : os.remove(doa_fp)
-        np.save(doa_fp, doa, allow_pickle=True)
-        print("DOA ground truth saved!")
-    except:
-        print("Error please debug")
+    dataset_dir = "../dataset/demo_dataset/"
+    os.makedirs(dataset_dir, exist_ok=True)
+
+    feature_fp = os.path.join(dataset_dir, "demo_salsalite_features.npy")
+    np.save(feature_fp, d, allow_pickle=True)
+    print("Features saved at {}!".format(feature_fp))
+    
+    gt_fp = os.path.join(dataset_dir, 'demo_class_labels.npy')
+    np.save(gt_fp, sed, allow_pickle=True)
+    print("Active class ground truth saved at {}!".format(gt_fp))
+    
+    doa_fp = os.path.join(dataset_dir, 'demo_doa_labels.npy')
+    np.save(doa_fp, doa, allow_pickle=True)
+    print("DOA ground truth saved at {}!".format(doa_fp))

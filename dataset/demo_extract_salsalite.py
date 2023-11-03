@@ -149,11 +149,12 @@ def compute_scaler(feature_dir):
 
     # Iterate through data
     for count, feature_fn in enumerate(tqdm(feature_fn_list)):
-        full_feature_fn = os.path.join(feature_dir, feature_fn)
-        with h5py.File(full_feature_fn, 'r') as hf:
-            afeature = hf['feature'][:]  # (n_chanels, n_timesteps, n_features)
-            for i_chan in range(n_feature_channels):
-                scaler_dict[i_chan].partial_fit(afeature[i_chan, :, :])  # (n_timesteps, n_features)
+        if feature_fn.endswith('.h5'):
+            full_feature_fn = os.path.join(feature_dir, feature_fn)
+            with h5py.File(full_feature_fn, 'r') as hf:
+                afeature = hf['feature'][:]  # (n_chanels, n_timesteps, n_features)
+                for i_chan in range(n_feature_channels):
+                    scaler_dict[i_chan].partial_fit(afeature[i_chan, :, :])  # (n_timesteps, n_features)
 
 
     # Extract mean and std
@@ -186,8 +187,8 @@ if __name__ == "__main__":
     print("Changing directory to : ", dname)
     os.chdir(dname)
     
-    # classes = ['dog', 'impact', 'speech']
-    classes = ['noise']
+    classes = ['dog', 'impact', 'speech']
+    # classes = ['noise']
     for cls in classes:
         
         audio_dir = './cleaned_data/{}'.format(cls)
