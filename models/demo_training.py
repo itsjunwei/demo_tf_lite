@@ -5,7 +5,6 @@ Similar to the ASC code
 
 To do:
     - Fix batch size error with the GRU layer
-    - Add noise data to the mix and test again 
     - Add logger
     - Global settings into .yml file
 """
@@ -44,7 +43,7 @@ dataset_split = [0.6, 0.2, 0.2]
 Dataset loading functions
 """
 # Load dataset
-demo_dataset_dir    = "../dataset/demo_dataset"
+demo_dataset_dir    = "../dataset/training_datasets/demo_dataset_1s_0.5s"
 feature_data_fp     = os.path.join(demo_dataset_dir, 'demo_salsalite_features.npy')
 class_label_fp      = os.path.join(demo_dataset_dir, 'demo_class_labels.npy')
 doa_label_fp        = os.path.join(demo_dataset_dir, "demo_doa_labels.npy")
@@ -78,7 +77,7 @@ test_size  = int(dataset_split[2] * dataset_size)
 # Shuffle the dataset before splitting
 shuffled_dataset = dataset.cache().shuffle(dataset_size)
 
-# Create the training dataset
+# Create the training dataset, drop_remainder otherwise will throw error with irregular batch sizes
 train_dataset       = shuffled_dataset.take(train_size)
 
 train_dataset       = train_dataset.batch(batch_size     = batch_size,
@@ -115,7 +114,7 @@ salsa_lite_model = get_model(input_shape    = input_shape,
                              n_classes      = n_classes,
                              azi_only       = True,
                              batch_size     = batch_size)
-salsa_lite_model.reset_states()
+salsa_lite_model.reset_states() # attempt to fix the stateful BIGRU
 # salsa_lite_model.summary()
 
 # Model Training Configurations
@@ -146,7 +145,6 @@ tensorboard_callback = TensorBoard(log_dir='../experiments/{}/logs'.format(now),
                                    histogram_freq=1)
 
 callbacks_list = [checkpoint, early, tensorboard_callback, csv_logger, schedule]
-# callbacks_list = [tensorboard_callback, csv_logger, schedule]
 
 # Checking if GPU is being used
 print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
@@ -154,18 +152,22 @@ print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
 # Train model
 """Adjusting the code to run in such a way that it will train once per epoch, track the losses
 and then predict on the validation set after each training epoch. It will then take the 
-predictions and do manual metrics calculation. To track val_loss, need to include the validation
-dataset into model.fit(). 
+predictions and do manual metrics calculation. 
 
 In this case, specifying steps_per_epoch will cause the dataset generator to not run
 infinitely (we want it to run once per epoch). So in this case, we do not specify the value.
-The first epoch will show xxx/unknown for the progress bar (if verbose = 1) and that is fine. 
+As such, the progress bar will show xxx/unknown (if verbose = 1) and that is fine. 
 
 TODO
     - Fix batch size limitation (GRU layer)
 """
-total_epochs = 10
+# Training Epochs
+total_epochs = 5
+# Store SELD Metrics
 train_stats = []
+os.makedirs('../experiments/{}/seld_model/'.format(now), exist_ok=True)
+
+# Training Loop
 for epoch_count in range(total_epochs):
     
     demo_model_hist = salsa_lite_model.fit(train_dataset,
@@ -181,23 +183,16 @@ for epoch_count in range(total_epochs):
                                n_classes    = n_classes,
                                n_val_iter   = int(val_size//batch_size))
     
-    # seld_metrics.update_seld_metrics()
-    # er_sed , sed_F1 , loc_err , loc_recall = seld_metrics.calculate_seld_metrics()
-    # seld_err = 0.25 * (er_sed + (1 - sed_F1) + (loc_err/180) + (1-loc_recall))
-    # train_stats.append([epoch_count+1, seld_err, er_sed, sed_F1, loc_err, loc_recall])
-    # print("SELD Error : {:.3f} , ER : {:.3f} , F1 : {:.3f}, LE : {:.3f}, LR : {:.3f}\n".format(seld_err, er_sed, sed_F1, loc_err, loc_recall))
     seld_error, error_rate, f_score, le_cd, lr_cd = seld_metrics.calc_csv_metrics()
     train_stats.append([epoch_count + 1, seld_error, error_rate, f_score, le_cd, lr_cd])
     
     # Check if lowest SELD Error
     min_SELD_error_array = min(train_stats, key = lambda x : x[1])
     if min_SELD_error_array[0] == epoch_count+1 : # Save the epoch model with lowest SELD Error
-        best_performing_epoch_path = "../experiments/{}/best_model_epoch_{}_seld_{}.h5".format(now, min_SELD_error_array[0], min_SELD_error_array[1])
+        best_performing_epoch_path = "../experiments/{}/seld_model/epoch_{}_seld_{:.3f}.h5".format(now, min_SELD_error_array[0], min_SELD_error_array[1])
         print("Best performing epoch : {}, SELD Error : {:.4f}".format(min_SELD_error_array[0], min_SELD_error_array[1]))
-        salsa_lite_model.save_weights(best_performing_epoch_path)
-
-# TODO 
-# Include way to save best performing model based off of SELD metrics    
+        salsa_lite_model.save_weights(best_performing_epoch_path, overwrite=True)
+   
 min_SELD_error_array = min(train_stats, key = lambda x : x[1])
 print("\nBest performing epoch : {}, SELD Error : {:.4f}".format(min_SELD_error_array[0], min_SELD_error_array[1]))
 
@@ -207,7 +202,6 @@ np.save('../experiments/{}/demo_model_hist.npy'.format(now),
         salsa_lite_model.history, 
         allow_pickle=True)
 
-# TODO
 is_inference = True
 if is_inference: 
     print("\n\nInfering on test set now...")
@@ -232,5 +226,6 @@ if is_inference:
     os.makedirs("../experiments/{}/outputs".format(now), exist_ok = True)
     df.to_csv(inference_csv_filepath, index=False, header=False)
     seld_metrics.calc_csv_metrics(filepath = inference_csv_filepath)
+    print("Inference CSV stored at :  {}".format(inference_csv_filepath))
 else:
     print("Not inferring!")

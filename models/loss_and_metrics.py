@@ -281,7 +281,7 @@ class SELDMetrics(object):
         self.n_classes = n_classes
         self.doa_threshold = doa_threshold
         self.sed_threshold = sed_threshold
-        self.n_val_iter = n_val_iter
+        self.n_val_iter = n_val_iter # number of validation iterations (just for tqdm)
         
         # For SED metrics (F1 score)
         self._TP = 0
@@ -385,32 +385,33 @@ class SELDMetrics(object):
         Differs from the `calculate_seld_metrics()` function in the sense that this uses
         csv, pandas and numpy arrays to calculate. It should be more accurate since do not 
         need to manipulate Tensors (unsure). The values will differ (also unsure why)"""
-        csv_metrics = []
-        # This is for a dataset created using the .from_generator() function
-        for x_val, y_val in tqdm(self.val_dataset, total = self.n_val_iter): 
-            
-            predictions = self.model.predict(x_val, 
-                                             verbose = 0)
-            
-            # Extract the SED values from the single array
-            SED_pred = remove_batch_dim(np.array(predictions[:, :, :self.n_classes]))
-            SED_gt   = remove_batch_dim(np.array(y_val[:, :, :self.n_classes])) 
-            # If the probability exceeds the threshold --> considered active (set to 1, else 0)
-            SED_pred = (SED_pred > self.sed_threshold).astype(int)
-                         
-            # Extract the DOA values (X,Y) and convert them into azimuth
-            azi_gt   = convert_xy_to_azimuth(remove_batch_dim(np.array(y_val[:, : , self.n_classes:])), n_classes = self.n_classes)
-            azi_pred = convert_xy_to_azimuth(remove_batch_dim(np.array(predictions[:, : , self.n_classes:])), n_classes = self.n_classes)
-
-            for i in range(len(SED_pred)):
-                output = np.concatenate([SED_pred[i], SED_gt[i], azi_pred[i], azi_gt[i]],
-                                        axis = -1)
-                csv_metrics.append(output.flatten())
-        
-        # Create and compile the csv_metrics array    
-        data = pd.DataFrame(csv_metrics)
         if filepath is not None:
             data = pd.read_csv(filepath, header=None)
+        else:
+            csv_metrics = []
+            # This is for a dataset created using the .from_generator() function
+            for x_val, y_val in tqdm(self.val_dataset, total = self.n_val_iter): 
+                
+                predictions = self.model.predict(x_val, 
+                                                verbose = 0)
+                
+                # Extract the SED values from the single array
+                SED_pred = remove_batch_dim(np.array(predictions[:, :, :self.n_classes]))
+                SED_gt   = remove_batch_dim(np.array(y_val[:, :, :self.n_classes])) 
+                # If the probability exceeds the threshold --> considered active (set to 1, else 0)
+                SED_pred = (SED_pred > self.sed_threshold).astype(int)
+                            
+                # Extract the DOA values (X,Y) and convert them into azimuth
+                azi_gt   = convert_xy_to_azimuth(remove_batch_dim(np.array(y_val[:, : , self.n_classes:])), n_classes = self.n_classes)
+                azi_pred = convert_xy_to_azimuth(remove_batch_dim(np.array(predictions[:, : , self.n_classes:])), n_classes = self.n_classes)
+
+                for i in range(len(SED_pred)):
+                    output = np.concatenate([SED_pred[i], SED_gt[i], azi_pred[i], azi_gt[i]],
+                                            axis = -1)
+                    csv_metrics.append(output.flatten())
+            
+            # Create and compile the csv_metrics array    
+            data = pd.DataFrame(csv_metrics)
 
         # SED predictions (first n_classes) and gt (second n_classes)
         sed_pred = data.iloc[:, :self.n_classes*2]
@@ -429,6 +430,8 @@ class SELDMetrics(object):
         c_sed_c_doa = 0 # Num of correct SED & DOA
         c_sed_c_doa_total_doa_error = 0 # DOA error for correct SED & DOA
         lecd_doa_error = 0 # total DOA error for correct SED preds
+        gt_postive_doa_err = []
+        gt_negative_doa_err = []
         total_S = 0 # Subtitutions
         total_D = 0 # Deletions
         total_I = 0 # Insertions
@@ -453,9 +456,13 @@ class SELDMetrics(object):
                     if sed_p[class_idx] != 0: # since correct SED prediction (sed_p == 1, sed_g == 1)
                         doa_diff = doa[idx][class_idx] - doa[idx][class_idx + self.n_classes] # DOA difference
                         while doa_diff < -180 : doa_diff += 360
-                        while doa_diff >= 180 : doa_diff -= 360 
+                        while doa_diff >= 180 : doa_diff -= 360 # Limit to [-180, 180)
                         doa_diff = np.abs(doa_diff) # Convert to absolute DOA difference
                         lecd_doa_error += doa_diff # sum the total DOA errors for correct SED predictions
+                        if doa[idx][class_idx + self.n_classes] >= 0:
+                            gt_postive_doa_err.append(doa_diff)
+                        elif doa[idx][class_idx + self.n_classes] < 0:
+                            gt_negative_doa_err.append(doa_diff)
                         if doa_diff <= self.doa_threshold: # Correct DOA prediction
                             c_sed_c_doa += 1 # number of correct DOA and SED
                             c_sed_c_doa_total_doa_error += np.abs(doa_diff) # DOA diff total for correct DOA and SED
@@ -471,6 +478,7 @@ class SELDMetrics(object):
         seld_error = 0.25 * (error_rate + (1-f_score) + le_cd/180 + (1-lr_cd))
         # Raw Accuracy --> Ignore DOA Threshold
         print("Raw Accuracy : {:.4f}, DOA Error for Correct Preds : {:.4f}".format(sed_accuracy, (c_sed_c_doa_total_doa_error/c_sed_c_doa)))
+        print("DOA Errors for Positive GT DOA : {:.4f} , Negative GT DOA : {:.4f}".format( sum(gt_postive_doa_err) / len(gt_postive_doa_err), sum(gt_negative_doa_err) / len(gt_negative_doa_err) ) ) 
         print("SELD Error : {:.4f} , ER : {:.4f} , F1 : {:.4f}, LE : {:.4f}, LR : {:.4f}\n".format(seld_error, error_rate, f_score, le_cd, lr_cd))
         return seld_error, error_rate, f_score, le_cd, lr_cd
         

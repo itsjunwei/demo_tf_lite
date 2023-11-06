@@ -476,12 +476,12 @@ def get_model(input_shape,
     # Create model 
     model = Model(inputs  = inputs,
                   outputs = single_array_output, 
-                  name    = 'SALSA_model_test')
+                  name    = 'full_SALSALITE_model')
 
     model.compile(optimizer    = tf.keras.optimizers.Adam(learning_rate = 3e-4),
-                  loss         = [sed_loss , doa_loss],
-                  loss_weights = [0.2, 0.8],
-                  metrics      = [sed_loss, doa_loss])
+                  loss         = [seld_loss],
+                #   loss_weights = [0.2, 0.8],
+                  metrics      = [seld_loss])
 
     return model
 

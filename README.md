@@ -10,6 +10,9 @@ Data to be stored in the `cleaned_data` folder, with sub-folders for each sub-cl
 ### Dataset Creation
 In order to feed the data into the model, we will use generators and the Tensorflow `.from_generator()` function. We will convert the features and their corresponding ground truth labels to `.npy` files and store them in `./dataset/demo_dataset`. The ground truths are in the form of (n_timeframes x 3*n_classes), the first n_classes representing the SED ground truth, and the next two n_classes the X,Y Cartesian coordinate directions.
 
+### End-to-end Dataset Generation
+Follow this instead... In the `dataset` folder, run `dataset_generator.py` with desired configurations. This file will handle the segmentation of the concatenated audio, the conversion of audio segments to SALSA-Lite features and the creation of the data/ground truth .npy files to feed into the model for training.
+
 ### Model Training
 In the `models` folder, just run `demo_training.py` and adjust the global settings accordingly. 
 

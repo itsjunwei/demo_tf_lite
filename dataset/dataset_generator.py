@@ -22,11 +22,26 @@ def segment_concat_audio(concat_data_dir = "./data/Dataset_concatenated_tracks/"
                          hop_duration = 0.1,
                          add_wgn = False,
                          snr_db = None):
+    """Convert the concatenated audio files into segmented audio segments. This is meant to be the step
+    prior to conversion to SALSA-Lite Features
+    
+    Input
+        concat_data_dir : (filepath) Where all the concatenated tracks are stored, seperated by subclass
+                            folders
+        fs : (int) Sampling Frequency in Hertz (Hz)
+        window_duration : (float) Input window duration in seconds
+        hop_duration    : (float) Hop/Overlap duration between consecutive windows in seconds
+        add_wgn         : (boolean) True if wish to add white Gaussian noise
+        snr_db          : (int) Desired level of SNR if WGN is to be added, defaults to 20dB
+        
+    Returns
+        higher_level_dir : (filepath) Directory where all the segmented data will be stored (and seperated
+                            by class subfolders)"""
 
     class_types = ['Dog', 'Impact' , 'Speech']
     # Manual settings 
-    frame_len = int(window_duration*fs) # 200ms
-    hop_len = int(hop_duration*fs)   # 100ms
+    frame_len = int(window_duration*fs) 
+    hop_len = int(hop_duration*fs)   
 
     for ct in class_types:
         
@@ -34,8 +49,8 @@ def segment_concat_audio(concat_data_dir = "./data/Dataset_concatenated_tracks/"
         full_data_dir = os.path.join(concat_data_dir, ct)
         
         # cleaned, output data directory
-        output_data_dir = './cleaned_data_{}s_{}s/{}'.format(window_duration, hop_duration, ct.lower())
-        higher_level_dir = './cleaned_data_{}s_{}s/'.format(window_duration, hop_duration)
+        output_data_dir = './_audio/cleaned_data_{}s_{}s/{}'.format(window_duration, hop_duration, ct.lower())
+        higher_level_dir = './_audio/cleaned_data_{}s_{}s/'.format(window_duration, hop_duration)
         # create dirs
         os.makedirs(output_data_dir, exist_ok=True)
         print("Storing {} data in :  {}".format(ct, output_data_dir))
@@ -197,16 +212,16 @@ if __name__ == "__main__":
     os.chdir(dname)
     
     # Window, Hop duration in seconds 
-    ws = 1
-    hs = 0.5
+    ws = 0.2
+    hs = 0.1
     
     # Segment the audio first 
     audio_upper_dir = segment_concat_audio(window_duration=ws,
-                                     hop_duration=hs)
+                                           hop_duration=hs)
     
     # Next, we extract the features for the segmented audio clips
     classes = ['dog', 'impact', 'speech']
-    feature_upper_dir = './features_{}s_{}s'.format(ws, hs)
+    feature_upper_dir = './_features/features_{}s_{}s'.format(ws, hs)
     for cls in classes:
         audio_dir = os.path.join(audio_upper_dir, cls)
         feature_dir = os.path.join(feature_upper_dir, cls)
@@ -217,7 +232,7 @@ if __name__ == "__main__":
     d , sed, doa = create_dataset(feature_upper_dir)
 
     # Create directories for storage
-    dataset_dir = "./demo_dataset_{}s_{}s/".format(ws,hs)
+    dataset_dir = "./training_datasets/demo_dataset_{}s_{}s/".format(ws,hs)
     os.makedirs(dataset_dir, exist_ok=True)
 
     feature_fp = os.path.join(dataset_dir, "demo_salsalite_features.npy")
