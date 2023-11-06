@@ -242,11 +242,15 @@ def convert_xy_to_azimuth(array,
     
     x_coords = array[: , :n_classes]
     y_coords = array[: , n_classes:]
-    azimuths = np.arctan2(y_coords, x_coords)
-    azimuth_deg = np.degrees(azimuths)
-    azimuth_deg[azimuth_deg >= 180] -= 360 # Crop the azimuths to be [-180, 180)
+    azimuths = np.around(np.arctan2(y_coords, x_coords) * 180.0 / np.pi)
+    azimuths[azimuths == 180] = -180
+    
+    return azimuths
+    # azimuths = np.arctan2(y_coords, x_coords)
+    # azimuth_deg = np.degrees(azimuths)
+    # azimuth_deg[azimuth_deg >= 180] -= 360 # Crop the azimuths to be [-180, 180)
 
-    return azimuth_deg    
+    # return azimuth_deg    
 
 def get_angular_distance(azimuth_difference):
         """For an input absolute azimuth difference, returns the angular distance

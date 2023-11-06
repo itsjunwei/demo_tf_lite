@@ -197,8 +197,8 @@ if __name__ == "__main__":
     os.chdir(dname)
     
     # Window, Hop duration in seconds 
-    ws = 0.2
-    hs = 0.1
+    ws = 1
+    hs = 0.5
     
     # Segment the audio first 
     audio_upper_dir = segment_concat_audio(window_duration=ws,
@@ -212,12 +212,12 @@ if __name__ == "__main__":
         feature_dir = os.path.join(feature_upper_dir, cls)
         extract_features(audio_dir, feature_dir)
         compute_scaler(feature_dir)
-    
+
     # Create arrays for feature, ground truth labels dataset
     d , sed, doa = create_dataset(feature_upper_dir)
 
     # Create directories for storage
-    dataset_dir = "./dataset/demo_dataset_{}s_{}s/".format(ws,hs)
+    dataset_dir = "./demo_dataset_{}s_{}s/".format(ws,hs)
     os.makedirs(dataset_dir, exist_ok=True)
 
     feature_fp = os.path.join(dataset_dir, "demo_salsalite_features.npy")
