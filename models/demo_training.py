@@ -44,7 +44,7 @@ dataset_split = [0.6, 0.2, 0.2]
 Dataset loading functions
 """
 # Load dataset
-demo_dataset_dir    = "../dataset/demo_dataset_noise"
+demo_dataset_dir    = "../dataset/demo_dataset"
 feature_data_fp     = os.path.join(demo_dataset_dir, 'demo_salsalite_features.npy')
 class_label_fp      = os.path.join(demo_dataset_dir, 'demo_class_labels.npy')
 doa_label_fp        = os.path.join(demo_dataset_dir, "demo_doa_labels.npy")
@@ -193,7 +193,7 @@ for epoch_count in range(total_epochs):
     min_SELD_error_array = min(train_stats, key = lambda x : x[1])
     if min_SELD_error_array[0] == epoch_count+1 : # Save the epoch model with lowest SELD Error
         best_performing_epoch_path = "../experiments/{}/best_model_epoch_{}_seld_{}.h5".format(now, min_SELD_error_array[0], min_SELD_error_array[1])
-        print("\nBest performing epoch : {}, SELD Error : {:.4f}".format(min_SELD_error_array[0], min_SELD_error_array[1]))
+        print("Best performing epoch : {}, SELD Error : {:.4f}".format(min_SELD_error_array[0], min_SELD_error_array[1]))
         salsa_lite_model.save_weights(best_performing_epoch_path)
 
 # TODO 
@@ -233,4 +233,4 @@ if is_inference:
     df.to_csv(inference_csv_filepath, index=False, header=False)
     seld_metrics.calc_csv_metrics(filepath = inference_csv_filepath)
 else:
-    print("Done!")
+    print("Not inferring!")

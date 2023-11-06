@@ -301,7 +301,6 @@ class SELDMetrics(object):
         It will cycle through the dataset generator, compute predictions for each batch
         and update the SELD scores. 
         """
-        csv_metrics = []
         # This is for a dataset created using the .from_generator() function
         for x_val, y_val in tqdm(self.val_dataset, total = self.n_val_iter): 
             
@@ -317,14 +316,6 @@ class SELDMetrics(object):
             # Extract the DOA values (X,Y) and convert them into azimuth
             azi_gt   = convert_xy_to_azimuth(remove_batch_dim(np.array(y_val[:, : , self.n_classes:])), n_classes = self.n_classes)
             azi_pred = convert_xy_to_azimuth(remove_batch_dim(np.array(predictions[:, : , self.n_classes:])), n_classes = self.n_classes)
-
-            for i in range(len(SED_pred)):
-                output = np.concatenate([SED_pred[i], 
-                                         SED_gt[i],
-                                         azi_pred[i],
-                                         azi_gt[i]],
-                                        axis = -1)
-                csv_metrics.append(output.flatten())
             
             # compute False Negatives (FN), False Positives (FP) and True Positives (TP)
             loc_FN = np.logical_and(SED_gt == 1, SED_pred == 0).sum(1)
@@ -355,9 +346,6 @@ class SELDMetrics(object):
             FN_doa = np.abs(azi_gt - azi_pred) > self.doa_threshold # azimuth diff is outside threshold
             loc_FN = np.logical_and(TP_sed, FN_doa).sum() # num of correct SED, wrong DOA
             self._DE_FN += loc_FN # total count of correct SED, wrong DOA
-        df = pd.DataFrame(csv_metrics)
-        os.makedirs('./temp_metrics', exist_ok = True)
-        df.to_csv('./temp_metrics/temp_data.csv', index=False, header=False)
         
     def calculate_seld_metrics(self):
         """Generate the SELD metrics from the calculated values
@@ -385,7 +373,7 @@ class SELDMetrics(object):
 
         return _ER, _F1, LE_CD, LR_CD
     
-    def calc_csv_metrics(self, filepath='./temp_metrics/temp_data.csv'):
+    def calc_csv_metrics(self, filepath = None):
         """Generate SELD Metrics from the predictions / ground truth that is stored in
         csv format when calling the `update_seld_metrics()` function. Need to call this
         function before using calc_csv_metrics(). 
@@ -414,11 +402,11 @@ class SELDMetrics(object):
                 output = np.concatenate([SED_pred[i], SED_gt[i], azi_pred[i], azi_gt[i]],
                                         axis = -1)
                 csv_metrics.append(output.flatten())
-                
+        
+        # Create and compile the csv_metrics array    
         data = pd.DataFrame(csv_metrics)
-
-        # # Read the predictions/gt data file
-        # data = pd.read_csv(filepath, header=None)
+        if filepath is not None:
+            data = pd.read_csv(filepath, header=None)
 
         # SED predictions (first n_classes) and gt (second n_classes)
         sed_pred = data.iloc[:, :self.n_classes*2]
@@ -443,6 +431,7 @@ class SELDMetrics(object):
         total_Nref = 0 # Total number of frames with active classes
         sed_FN = 0 # Total SED False Negatives
         sed_FP = 0 # Total SED False Positives
+        c_sed_w_doa = 0
 
         for idx, is_sed in enumerate(mask):
             sed_p   = sed[idx][:self.n_classes] # SED Prediction for a timeframe
@@ -460,17 +449,21 @@ class SELDMetrics(object):
                     if sed_p[class_idx] != 0: # since correct SED prediction (sed_p == 1, sed_g == 1)
                         doa_diff = doa[idx][class_idx] - doa[idx][class_idx + self.n_classes] # DOA difference
                         while doa_diff < -180 : doa_diff += 360
-                        while doa_diff >= 180 : doa_diff -= 360 # adjust to [-180, 180)
-                        lecd_doa_error += np.abs(doa_diff) # sum the total DOA errors for correct SED predictions
+                        while doa_diff >= 180 : doa_diff -= 360 
+                        doa_diff = np.abs(doa_diff) # Convert to absolute DOA difference
+                        lecd_doa_error += doa_diff # sum the total DOA errors for correct SED predictions
                         if doa_diff <= self.doa_threshold: # Correct DOA prediction
                             c_sed_c_doa += 1 # number of correct DOA and SED
                             c_sed_c_doa_total_doa_error += np.abs(doa_diff) # DOA diff total for correct DOA and SED
+                        else:
+                            c_sed_w_doa += 1
+                            
         
         # SELD Metrics of Error Rate, F-Score, Localization Error and Recall                    
         error_rate = (total_S + total_D + total_I) / (total_Nref)
         f_score    = c_sed_c_doa / (c_sed_c_doa + 0.5 * (sed_FN + sed_FP))
         le_cd      = lecd_doa_error / correct_sed
-        lr_cd      = c_sed_c_doa/total_Nref
+        lr_cd      = c_sed_c_doa/(c_sed_c_doa + c_sed_w_doa)
         seld_error = 0.25 * (error_rate + (1-f_score) + le_cd/180 + (1-lr_cd))
         # Raw Accuracy --> Ignore DOA Threshold
         print("Raw Accuracy : {:.4f}, DOA Error for Correct Preds : {:.4f}".format(sed_accuracy, (c_sed_c_doa_total_doa_error/c_sed_c_doa)))
