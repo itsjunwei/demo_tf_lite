@@ -26,9 +26,8 @@ def segment_concat_audio(concat_data_dir = "./data/Dataset_concatenated_tracks/"
     prior to conversion to SALSA-Lite Features
     
     Input
-        concat_data_dir : (filepath) Where all the concatenated tracks are stored, seperated by subclass
-                            folders
-        fs : (int) Sampling Frequency in Hertz (Hz)
+        concat_data_dir : (filepath) Where all the concatenated tracks are stored, seperated by subclass folders
+        fs              : (int) Sampling Frequency in Hertz (Hz)
         window_duration : (float) Input window duration in seconds
         hop_duration    : (float) Hop/Overlap duration between consecutive windows in seconds
         add_wgn         : (boolean) True if wish to add white Gaussian noise
@@ -53,7 +52,7 @@ def segment_concat_audio(concat_data_dir = "./data/Dataset_concatenated_tracks/"
         higher_level_dir = './_audio/cleaned_data_{}s_{}s/'.format(window_duration, hop_duration)
         # create dirs
         os.makedirs(output_data_dir, exist_ok=True)
-        print("Storing {} data in :  {}".format(ct, output_data_dir))
+        print("Storing {} audio in :  {}".format(ct, output_data_dir))
         
         # loop through raw data dir
         for file in os.listdir(full_data_dir):
@@ -110,9 +109,9 @@ def load_file(filepath):
     
     # Read the h5 file
     hf = h5py.File(filepath, 'r')
-    features = hf['feature'][:] # features --> n_channels , n_timebins, n_freqbins (7,17,191)
+    features = hf['feature'][:] # features --> n_channels , n_timebins, n_freqbins 
 
-    n_frames_out = int(np.floor(len(features[0])//16))
+    n_frames_out = int(np.floor(len(features[0])//16)) # Number of timeframes model will output
 
     # Converting to one-hot encoding
     class_labels = ['dog',
@@ -123,7 +122,7 @@ def load_file(filepath):
     filename = filepath.split(os.sep)[-1] # filename  =  class_azimuth_idx.h5
     gts = filename.split('_') # [class, azimuth, ... ]
     
-    if gts[0] == "noise":
+    if gts[0] == "noise": # Everything is zero
         gt_class = np.zeros(len(class_labels), dtype=np.float32)
         gt_doa   = np.zeros(len(class_labels)*2, dtype=np.float32)
         gt_class = gt_class.reshape((1,3))
@@ -148,8 +147,8 @@ def load_file(filepath):
         gt_azi = -150
     gt_doa = np.zeros(len(class_labels)*2, dtype=np.float32)
     azi_rad = np.deg2rad(gt_azi)
-    gt_doa[class_idx] = np.cos(azi_rad)
-    gt_doa[len(class_labels) + class_idx] = np.sin(azi_rad)
+    gt_doa[class_idx] = np.cos(azi_rad) # X-coordinate
+    gt_doa[len(class_labels) + class_idx] = np.sin(azi_rad) # Y-coordinate
     
     # Ground Truth should be in the form of 
     # class : onehot encoding

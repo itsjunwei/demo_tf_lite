@@ -139,7 +139,7 @@ def scheduler(epoch, lr):
 schedule = LearningRateScheduler(scheduler)
 
 csv_logger = CSVLogger(filename = '../experiments/{}/training_demo.csv'.format(now), 
-                       append=False)
+                       append=True)
 
 tensorboard_callback = TensorBoard(log_dir='../experiments/{}/logs'.format(now), 
                                    histogram_freq=1)
