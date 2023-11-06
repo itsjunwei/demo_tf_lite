@@ -12,6 +12,67 @@ import pandas as pd
 import numpy as np
 import os
 from tqdm import tqdm
+import librosa
+import soundfile as sf
+from demo_extract_salsalite import *
+
+def segment_concat_audio(concat_data_dir = "./data/Dataset_concatenated_tracks/",
+                         fs = 24000,
+                         window_duration = 0.2,
+                         hop_duration = 0.1,
+                         add_wgn = False,
+                         snr_db = None):
+
+    class_types = ['Dog', 'Impact' , 'Speech']
+    # Manual settings 
+    frame_len = int(window_duration*fs) # 200ms
+    hop_len = int(hop_duration*fs)   # 100ms
+
+    for ct in class_types:
+        
+        # raw data directory
+        full_data_dir = os.path.join(concat_data_dir, ct)
+        
+        # cleaned, output data directory
+        output_data_dir = './cleaned_data_{}s_{}s/{}'.format(window_duration, hop_duration, ct.lower())
+        higher_level_dir = './cleaned_data_{}s_{}s/'.format(window_duration, hop_duration)
+        # create dirs
+        os.makedirs(output_data_dir, exist_ok=True)
+        print("Storing {} data in :  {}".format(ct, output_data_dir))
+        
+        # loop through raw data dir
+        for file in os.listdir(full_data_dir):
+            if file.endswith('.wav'):
+                fullfn = os.path.join(full_data_dir, file)
+                
+                # extract azimuth from gt
+                vars = file.split('_')
+                azimuth = vars[2]
+                
+                # load audio
+                audio , _ = librosa.load(fullfn, sr=fs, mono=False, dtype=np.float32)
+                
+                if add_wgn:
+                    signal_power = np.mean(np.abs(audio) ** 2)
+                    if snr_db is None:
+                        snr_db = 20
+                    desired_SNR_dB = snr_db
+                    # Calculate the standard deviation of the noise
+                    noise_std_dev = np.sqrt(signal_power / (10 ** (desired_SNR_dB / 10)))
+                    # Generate the noise
+                    noise = np.random.normal(0, noise_std_dev, size=audio.shape)
+                    audio += noise
+                
+                # Segment the audio input into overlapping frames
+                frames = librosa.util.frame(audio, frame_length=frame_len, hop_length=hop_len)
+                
+                # Transpose into (n_segments, timebins, channels)
+                frames = frames.T
+                for idx, frame in enumerate(tqdm(frames)):
+                    final_fn = "{}_{}_{}.wav".format(ct.lower(), azimuth, idx+1)
+                    final_fp = os.path.join(output_data_dir, final_fn)
+                    sf.write(final_fp, frame, samplerate=fs)
+    return higher_level_dir
 
 
 def load_file(filepath):
@@ -87,7 +148,7 @@ def load_file(filepath):
     return features , gt_class , gt_doa
 
 
-def create_dataset():
+def create_dataset(feature_path_dir):
     """Create dataset
 
     Returns:
@@ -100,10 +161,11 @@ def create_dataset():
     doa_labels = []
     classes = ['dog', 'impact', 'speech']
     for cls in classes:
-        feature_dir = '../dataset/features/{}'.format(cls)
+        feature_dir = os.path.join(feature_path_dir, cls)
         
         # Get the class-wise mean and std.dev to normalize features
-        scaler_filepath = '../dataset/features/scalers/{}_feature_scaler.h5'.format(cls)
+        scaler_dir = os.path.join(feature_path_dir, 'scalers')
+        scaler_filepath = os.path.join(scaler_dir, '{}_feature_scaler.h5'.format(cls))
         with h5py.File(scaler_filepath, 'r') as shf:
             mean = shf['mean'][:]
             std = shf['std'][:]
@@ -134,11 +196,28 @@ if __name__ == "__main__":
     print("Changing directory to : ", dname)
     os.chdir(dname)
     
+    # Window, Hop duration in seconds 
+    ws = 0.2
+    hs = 0.1
+    
+    # Segment the audio first 
+    audio_upper_dir = segment_concat_audio(window_duration=ws,
+                                     hop_duration=hs)
+    
+    # Next, we extract the features for the segmented audio clips
+    classes = ['dog', 'impact', 'speech']
+    feature_upper_dir = './features_{}s_{}s'.format(ws, hs)
+    for cls in classes:
+        audio_dir = os.path.join(audio_upper_dir, cls)
+        feature_dir = os.path.join(feature_upper_dir, cls)
+        extract_features(audio_dir, feature_dir)
+        compute_scaler(feature_dir)
+    
     # Create arrays for feature, ground truth labels dataset
-    d , sed, doa = create_dataset()
+    d , sed, doa = create_dataset(feature_upper_dir)
 
     # Create directories for storage
-    dataset_dir = "../dataset/demo_dataset/"
+    dataset_dir = "./dataset/demo_dataset_{}s_{}s/".format(ws,hs)
     os.makedirs(dataset_dir, exist_ok=True)
 
     feature_fp = os.path.join(dataset_dir, "demo_salsalite_features.npy")
