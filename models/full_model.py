@@ -480,7 +480,6 @@ def get_model(input_shape,
 
     model.compile(optimizer    = tf.keras.optimizers.Adam(learning_rate = 3e-4),
                   loss         = [seld_loss],
-                #   loss_weights = [0.2, 0.8],
                   metrics      = [seld_loss])
 
     return model
