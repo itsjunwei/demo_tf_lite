@@ -451,9 +451,9 @@ class SELDMetrics(object):
             total_Nref += sed_g.sum() # Num of active classes per timeframe
             sed_FP  += loc_FP.sum() 
             sed_FN  += loc_FN.sum()
-            if is_sed: # correct SED prediction
+            if is_sed: # correct SED prediction across all classes
                 for class_idx in range(self.n_classes): # loop through the classes
-                    if sed_p[class_idx] != 0: # since correct SED prediction (sed_p == 1, sed_g == 1)
+                    if int(sed_p[class_idx]) == 1: # since correct SED prediction (sed_p == 1, sed_g == 1)
                         doa_diff = doa[idx][class_idx] - doa[idx][class_idx + self.n_classes] # DOA difference
                         while doa_diff < -180 : doa_diff += 360
                         while doa_diff >= 180 : doa_diff -= 360 # Limit to [-180, 180)
