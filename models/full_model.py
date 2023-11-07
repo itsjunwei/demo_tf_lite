@@ -334,12 +334,14 @@ def bigru_unit(x, add_dense=False):
     """
     
     # To do : check how to merge the final bigru
-    bigru1 = Bidirectional(GRU(units=256, return_sequences=True, name="GRU1"), name="BiGRU1")(x)
+    bigru1 = Bidirectional(GRU(units=256, return_sequences=True, merge_mode = 'concat', name="GRU1"), 
+                           name="BiGRU1")(x)
     bigru1 = Dropout(0.3)(bigru1)
-    bigru2 = Bidirectional(GRU(units=256, return_sequences=True, name="GRU2"), name="BiGRU2")(bigru1)
+    bigru2 = Bidirectional(GRU(units=256, return_sequences=True, merge_mode = 'concat', name="GRU2"), 
+                           name="BiGRU2")(bigru1)
 
     # Unsure about the cost/benefits of adding this layer
-    if add_dense : bigru2 = TimeDistributed(Dense(512))(bigru2)
+    if add_dense : bigru2 = TimeDistributed(Dense(256))(bigru2)
     
     return bigru2
 
@@ -360,7 +362,8 @@ def sed_fcn(x, n_classes=3):
     
     # default values will do
     x = Dropout(0.2)(x)
-    x = Dense(512, activation="relu")(x)
+    x = Dense(256, activation=None, name = 'sed_fcn1')(x)
+    x = ReLU(name = 'sed_relu')(x)
     x = Dropout(0.2)(x)
     x = Dense(n_classes, name='event_frame_logits')(x)
     x = Activation('sigmoid', name='event_pred')(x)
@@ -388,13 +391,15 @@ def doa_fcn(input, azi_only=False, n_classes=3):
     x = Dropout(0.2)(input)
     x = Dense(256, name='dense_x')(x)
     x = Dropout(0.2)(x)
-    x_out = Dense(n_classes, activation='tanh', name='x_output')(x)
+    x_out = Dense(n_classes, activation=None, name='x_output')(x)
+    x_out = Activation('tanh', name = 'x_tanh')(x_out)
 
     # Y-Direction
     y = Dropout(0.2)(input)
     y = Dense(256, name='dense_y')(y)
     y = Dropout(0.2)(y)
-    y_out = Dense(n_classes, activation='tanh', name='y_output')(y)
+    y_out = Dense(n_classes, activation=None, name='y_output')(y)
+    y_out = Activation('tanh', name = 'y_tanh')(y_out)
 
     # If Azimuth only, no need the fully connected layer for the Z-direction predictions
     if not azi_only:
@@ -402,7 +407,8 @@ def doa_fcn(input, azi_only=False, n_classes=3):
         z = Dropout(0.2)(input)
         z = Dense(256, name='dense_z')(z)
         z = Dropout(0.2)(z)
-        z_out = Dense(n_classes, activation='tanh', name='z_output')(z)
+        z_out = Dense(n_classes, activation=None, name='z_output')(z)
+        z_out = Activation('tanh', name = 'z_tanh')(z_out)
         
     if azi_only:
         # (batch_size, time_steps, 2 * n_classes)

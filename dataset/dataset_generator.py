@@ -200,19 +200,20 @@ if __name__ == "__main__":
     ws = 0.2
     hs = 0.1
     
-    # Segment the audio first 
-    audio_upper_dir = segment_concat_audio(window_duration=ws,
-                                           hop_duration=hs) # './_audio/cleaned_data_{}s_{}s/'.format(window_duration, hop_duration)
+    # # Segment the audio first 
+    # audio_upper_dir = segment_concat_audio(window_duration=ws,
+    #                                        hop_duration=hs) # './_audio/cleaned_data_{}s_{}s/'.format(window_duration, hop_duration)
+    audio_upper_dir = './_audio/cleaned_data_{}s_{}s/'.format(ws, hs)
 
     # Next, we extract the features for the segmented audio clips
     classes = ['dog', 'impact', 'speech']
-    feature_upper_dir = './_features/features_{}s_{}s'.format(ws, hs)
+    feature_upper_dir = os.path.join('.' , '_features', 'features_{}s_{}s'.format(ws, hs))
     for cls in classes:
         audio_dir = os.path.join(audio_upper_dir, cls)
         feature_dir = os.path.join(feature_upper_dir, cls)
         os.makedirs(os.path.join(feature_upper_dir, 'scalers'), exist_ok=True)
         extract_features(audio_dir, feature_dir)
-        compute_scaler(feature_dir, feature_upper_dir)
+        compute_scaler(feature_dir, upper_feat_dir=feature_upper_dir)
 
     # Create arrays for feature, ground truth labels dataset
     data , gt = create_dataset(feature_upper_dir)

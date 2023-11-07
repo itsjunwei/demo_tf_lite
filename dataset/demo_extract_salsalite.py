@@ -138,7 +138,8 @@ def extract_features(audio_dir,
 
 def compute_scaler(feature_dir, upper_feat_dir=None):
     
-    cls = feature_dir.split('/')[-1]
+    cls = feature_dir.split(os.sep)[-1]
+    print(cls)
     n_feature_channels = 4
     feature_fn_list = os.listdir(feature_dir)
     
@@ -171,10 +172,10 @@ def compute_scaler(feature_dir, upper_feat_dir=None):
     feature_mean = np.expand_dims(feature_mean, axis=1)
     feature_std = np.expand_dims(feature_std, axis=1)
 
-    if upper_feat_dir is not None:
-        scaler_path = os.path.join(upper_feat_dir, 'scalers', cls + '_feature_scaler.h5')
-    else:
+    if upper_feat_dir is None:
         scaler_path = os.path.join(feature_dir, 'scalers', cls + '_feature_scaler.h5')
+    else:
+        scaler_path = os.path.join(upper_feat_dir, 'scalers', cls + '_feature_scaler.h5')
     with h5py.File(scaler_path, 'w') as hf:
         hf.create_dataset('mean', data=feature_mean, dtype=np.float32)
         hf.create_dataset('std', data=feature_std, dtype=np.float32)
@@ -193,8 +194,13 @@ if __name__ == "__main__":
     classes = ['dog', 'impact', 'speech']
     # classes = ['noise']
     for cls in classes:
-        
-        audio_dir = './cleaned_data/{}'.format(cls)
-        feature_dir = './features/{}'.format(cls)
+        ws = 0.2
+        hs = 0.1
+        audio_upper_dir = './_audio/cleaned_data_{}s_{}s/'.format(ws, hs)
+        feature_upper_dir = os.path.join('.' , '_features', 'features_{}s_{}s'.format(ws, hs))
+        audio_dir = os.path.join(audio_upper_dir, cls)
+        feature_dir = os.path.join(feature_upper_dir, cls)
+        # audio_dir = './cleaned_data/{}'.format(cls)
+        # feature_dir = './features/{}'.format(cls)
         extract_features(audio_dir, feature_dir)
-        compute_scaler(feature_dir)
+        compute_scaler(feature_dir, upper_feat_dir=feature_upper_dir)
