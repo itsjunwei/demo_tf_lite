@@ -364,7 +364,7 @@ def sed_fcn(x, n_classes=3):
     x = Dense(512, activation="relu")(x)
     x = Dropout(0.2)(x)
     x = Dense(n_classes, name='event_frame_logits')(x)
-    x = Activation('sigmoid', name='event_pred')(x)
+    # x = Activation('sigmoid', name='event_pred')(x)
 
     # (batch_size, time_steps, n_classes)
     return x

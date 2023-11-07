@@ -51,7 +51,7 @@ def seld_loss(y_true, y_pred):
     
     sed_loss = binary_crossentropy(y_true=sed_gt,
                                    y_pred=sed_pred,
-                                   from_logits=False)
+                                   from_logits=True)
 
     doa_loss = masked_reg_loss_azimuth(event_frame_gt=sed_gt,
                                        doa_frame_gt=doa_gt,
@@ -312,7 +312,7 @@ class SELDMetrics(object):
                                              verbose = 0)
 
             # Extract the SED values from the single array
-            SED_pred = remove_batch_dim(np.array(predictions[:, :, :self.n_classes]))
+            SED_pred = remove_batch_dim(np.array(tf.sigmoid(predictions[:, :, :self.n_classes])))
             SED_gt   = remove_batch_dim(np.array(y_val[:, :, :self.n_classes])) 
             # If the probability exceeds the threshold --> considered active (set to 1, else 0)
             SED_pred = (SED_pred > self.sed_threshold).astype(int)
@@ -396,7 +396,7 @@ class SELDMetrics(object):
                                                 verbose = 0)
                 
                 # Extract the SED values from the single array
-                SED_pred = remove_batch_dim(np.array(predictions[:, :, :self.n_classes]))
+                SED_pred = remove_batch_dim(np.array(tf.sigmoid(predictions[:, :, :self.n_classes])))
                 SED_gt   = remove_batch_dim(np.array(y_val[:, :, :self.n_classes])) 
                 # If the probability exceeds the threshold --> considered active (set to 1, else 0)
                 SED_pred = (SED_pred > self.sed_threshold).astype(int)
