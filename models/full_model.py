@@ -83,9 +83,8 @@ def resnet_block(x, out_channels, stride, resnet_style='basic'):
     x               : (np.array) input data
     out_channels    : (int) number of output channels of the block
     stride          : (int) for SALSA, only the first micro conv has a stride of s
-    resnet_style    : (str) one of 'basic' , 'bottleneck' or 'dsc' corresponding to
-                            base (normal) , bottleneck or depthwise-seperable 
-                            convolutions that all micro-blocks will use
+    resnet_style    : (str) one of 'basic' (base), 'bottleneck' or 'dsc' corresponding to 
+                            the types of convolutions that all micro-blocks will use
 
     Returns
     -------
@@ -296,13 +295,13 @@ def frequency_pooling(x, pooling_type='avg'):
 
     Input
     -----
-    x               : (np.array) input data
-    pooling_type    : (str) how we wish to pool the frequency bins, one of 
+    x             : (np.array) input data
+    pooling_type  : (str) how we wish to pool the frequency bins, one of 
                             `avg`, `max` or `avg_max`
 
     Returns
     ------
-    x               : (np.array) output data 
+    x             : (np.array) output data 
     """
     # x = (batchsize, channels, timebins, freqbins)
 
@@ -326,12 +325,12 @@ def bigru_unit(x, add_dense=False):
     
     Input
     -----
-    x           : (np.array) input data
-    add_dense   : (boolean) True if adding the `TimeDistributed Dense` layer, False otherwise
+    x         : (np.array) input data
+    add_dense : (boolean) True if adding the `TimeDistributed Dense` layer, False otherwise
 
     Returns
     -------
-    x           : (np.array) output data
+    x         : (np.array) output data
     """
     
     # To do : check how to merge the final bigru
@@ -350,13 +349,13 @@ def sed_fcn(x, n_classes=3):
 
     Inputs
     ------
-    x           : (np.array) input data
-    n_classes   : (int) number of possible event classes
+    x         : (np.array) input data
+    n_classes : (int) number of possible event classes
 
     Returns
     -------
 
-    x           : (np.array) output data of shape (batch_size, time_steps, n_classes)
+    x         : (np.array) output data of shape (batch_size, time_steps, n_classes)
     """
     
     # default values will do
@@ -375,14 +374,14 @@ def doa_fcn(input, azi_only=False, n_classes=3):
 
     Inputs
     ------
-    x           : (np.array) input data
-    azi_only    : (boolean) True if only predicting Azimuth (X,Y) , False otherwise
-    n_classes   : (int) number of possible event classes
+    x         : (np.array) input data
+    azi_only  : (boolean) True if only predicting Azimuth (X,Y) , False otherwise
+    n_classes : (int) number of possible event classes
 
     Returns
     -------
 
-    doa_output  : (np.array) output data of shape (batch_size, time_steps, 2/3 * n_classes)
+    doa_output : (np.array) output data of shape (batch_size, time_steps, 2/3 * n_classes)
     """
 
     # X-Direction
@@ -418,7 +417,7 @@ def get_model(input_shape,
               resnet_style='basic', 
               n_classes=12, 
               azi_only = False, 
-              batch_size = 100):
+              batch_size = 1):
     """
     The entire SALSA-Lite model, using Keras functional API to design and flow
 
@@ -437,15 +436,15 @@ def get_model(input_shape,
 
     Inputs
     ------
-    input_shape     : (tuple) the shape of the input features
-    resnet_style    : (str) the type of ResNet to be used in the model
-    n_classes       : (int) number of possible event classes 
-    azi_only        : (boolean) True if only predicting Azimuth (X,Y) , False otherwise
-    batch_size      : (int) batch size. Meant to pass through the Input to the model
+    input_shape  : (tuple) the shape of the input features
+    resnet_style : (str) the type of ResNet to be used in the model
+    n_classes    : (int) number of possible event classes 
+    azi_only     : (boolean) True if only predicting Azimuth (X,Y) , False otherwise
+    batch_size   : (int) batch size. Meant to pass through the Input to the model
 
     Returns
     -------
-    model           : (model) Keras model
+    model        : (model) Keras model
     """
     
     # Create input of salsa-lite features
@@ -487,10 +486,9 @@ def get_model(input_shape,
 
 if __name__ == "__main__":
 
-    # Simulate one full minute input for testing
+    # Shape of a single input feature
     input_size = (7, 33, 96)
 
-    # Generate input, output pointers
     # use one of basic , bottleneck , dsc for resnet_style
     resnet_style = 'basic'
     n_classes = 3

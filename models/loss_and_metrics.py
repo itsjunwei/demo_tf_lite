@@ -168,49 +168,6 @@ def compute_masked_reg_loss(input, target, mask, loss_type = "MAE"):
 
     return reg_loss
 
-# not used
-def location_dependent_error_rate(y_true, y_pred):
-    """Calculate the location dependent error rate for the predictions.
-    
-    To classify as a correct prediction, the active class must be within a certain,
-    predefined range of error. This parameter is hard-coded for now as 10 degrees.
-    """
-    # hard coded value to split the array
-    n_classes = 3
-    
-    sed_pred = y_pred[:, : , :n_classes]
-    doa_x_pred = y_pred[:, : , n_classes:n_classes*2]
-    doa_y_pred = y_pred[:, : , n_classes*2:]
-    
-    sed_gt   = y_true[:, : , :n_classes]
-    doa_x_gt = y_true[:, : , n_classes:n_classes*2]
-    doa_y_gt = y_true[:, : , n_classes*2:]
-
-    
-    # Generate the one-hot output for the SED predictions
-    class_indicies      = tf.argmax(sed_pred, axis=-1)
-    one_hot_predictions = tf.one_hot(class_indicies, depth=sed_pred.shape[-1])
-    
-    azimuth_gt      = tf.math.atan2(doa_y_gt, doa_x_gt)
-    azimuth_pred    = tf.math.atan2(doa_y_pred, doa_x_pred)
-    
-    TP = 0
-    for idx in range(len(sed_gt)):
-        if tf.reduce_all(tf.math.equal(one_hot_predictions[idx], sed_gt[idx])):
-            doa_difference = tf.keras.backend.abs(azimuth_gt[idx] - azimuth_pred[idx])
-            masked_doa_difference = tf.multiply(sed_gt[idx], doa_difference)
-            difference_tensor = tf.reduce_max(input_tensor = masked_doa_difference,
-                                             axis = -1)
-            difference_value = tf.get_static_value(difference_tensor)
-            try:
-                if difference_value <= 10:
-                    TP += 1
-            except:
-                pass
-    er_cd = 1 - (TP/len(sed_gt))
-    
-    return er_cd
-
 def remove_batch_dim(tens):
     """Remove the batch dimension from an input tensor or 3D array
     Assumes that the input is of shape (batch_size x frames_per_batch x n_classes)
