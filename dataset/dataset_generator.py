@@ -98,7 +98,7 @@ def load_file(filepath):
 
     Input
     -----
-    filepath (str) : filepath to the h5 file
+    filepath (str) : filepath to the h5 file. Assuming the filename is [class]_[azimuth]_[index].h5
 
     Returns
     -------
@@ -123,18 +123,14 @@ def load_file(filepath):
     gts = filename.split('_') # [class, azimuth, ... ]
     
     if gts[0] == "noise": # Everything is zero
-        gt_class = np.zeros(len(class_labels), dtype=np.float32)
-        gt_doa   = np.zeros(len(class_labels)*2, dtype=np.float32)
-        gt_class = gt_class.reshape((1,3))
-        gt_doa = gt_doa.reshape((1,6))
-        gt_class = np.concatenate([gt_class]*n_frames_out, axis=0)
-        gt_doa   = np.concatenate([gt_doa]*n_frames_out, axis=0)
-        return features , gt_class , gt_doa
+        full_gt  = np.zeros(len(class_labels) * 3, dtype = np.float32)
+        frame_gt = np.concatenate([full_gt] * n_frames_out, axis = 0)
+        return features , frame_gt
 
+    full_gt = np.zeros(len(class_labels) * 3, dtype=np.float32)
     # One-hot class encoding
     class_idx = class_labels.index(gts[0])
-    gt_class = np.zeros(len(class_labels), dtype=np.float32)
-    gt_class[class_idx] = 1
+    full_gt[class_idx] = 1
     
     # Converting Azimuth into radians and assigning to active class
     gt_azi = int(gts[1])
@@ -145,21 +141,14 @@ def load_file(filepath):
         gt_azi = -90
     elif gt_azi == 210:
         gt_azi = -150
-    gt_doa = np.zeros(len(class_labels)*2, dtype=np.float32)
     azi_rad = np.deg2rad(gt_azi)
-    gt_doa[class_idx] = np.cos(azi_rad) # X-coordinate
-    gt_doa[len(class_labels) + class_idx] = np.sin(azi_rad) # Y-coordinate
-    
-    # Ground Truth should be in the form of 
-    # class : onehot encoding
-    # doa : azimuths in radians but converted to x,y
-    gt_class = gt_class.reshape((1,3))
-    gt_doa = gt_doa.reshape((1,6))
+    full_gt[class_idx + len(class_labels)] = np.cos(azi_rad) # X-coordinate
+    full_gt[class_idx + 2 * len(class_labels)] = np.sin(azi_rad) # Y-coordinate
     
     # Expand it such that it meets the required n_frames output
-    gt_class = np.concatenate([gt_class]*n_frames_out, axis=0)
-    gt_doa   = np.concatenate([gt_doa]*n_frames_out, axis=0)
-    return features , gt_class , gt_doa
+    frame_gt = np.concatenate([full_gt] * n_frames_out, axis=0)
+
+    return features , frame_gt
 
 
 def create_dataset(feature_path_dir):
@@ -171,8 +160,7 @@ def create_dataset(feature_path_dir):
         doa_labels      : dataset of doa ground truth labels
     """
     data = []
-    class_labels = []
-    doa_labels = []
+    gt_labels = []
     classes = ['dog', 'impact', 'speech']
     for cls in classes:
         feature_dir = os.path.join(feature_path_dir, cls)
@@ -189,17 +177,12 @@ def create_dataset(feature_path_dir):
         for file in tqdm(os.listdir(feature_dir)):
             if file.endswith('.h5'):
                 full_filepath = os.path.join(feature_dir, file)
-                salsa_features , cls_label, doa_label = load_file(filepath=full_filepath)
+                salsa_features , gt_label = load_file(filepath=full_filepath)
                 salsa_features[:4] = (salsa_features[:4]-mean)/std
                 data.append(salsa_features)
+                gt_labels.append(gt_label)
                 
-                # Because the n_frames_out per input may not be 1, need to find a way to calculate
-                # number of ground truth frames needed per input. For now, hardcoded
-                # TO-DO
-                class_labels.append(cls_label)
-                doa_labels.append(doa_label)
-                
-    return data, class_labels, doa_labels
+    return data, gt_labels
         
         
         
@@ -224,24 +207,21 @@ if __name__ == "__main__":
     for cls in classes:
         audio_dir = os.path.join(audio_upper_dir, cls)
         feature_dir = os.path.join(feature_upper_dir, cls)
+        os.makedirs(os.path.join(feature_dir, 'scalers'), exist_ok=True)
         extract_features(audio_dir, feature_dir)
         compute_scaler(feature_dir)
 
     # Create arrays for feature, ground truth labels dataset
-    d , sed, doa = create_dataset(feature_upper_dir)
+    data , gt = create_dataset(feature_upper_dir)
 
     # Create directories for storage
     dataset_dir = "./training_datasets/demo_dataset_{}s_{}s/".format(ws,hs)
     os.makedirs(dataset_dir, exist_ok=True)
 
     feature_fp = os.path.join(dataset_dir, "demo_salsalite_features.npy")
-    np.save(feature_fp, d, allow_pickle=True)
+    np.save(feature_fp, data, allow_pickle=True)
     print("Features saved at {}!".format(feature_fp))
     
-    gt_fp = os.path.join(dataset_dir, 'demo_class_labels.npy')
-    np.save(gt_fp, sed, allow_pickle=True)
+    gt_fp = os.path.join(dataset_dir, 'demo_gt_labels.npy')
+    np.save(gt_fp, gt, allow_pickle=True)
     print("Active class ground truth saved at {}!".format(gt_fp))
-    
-    doa_fp = os.path.join(dataset_dir, 'demo_doa_labels.npy')
-    np.save(doa_fp, doa, allow_pickle=True)
-    print("DOA ground truth saved at {}!".format(doa_fp))

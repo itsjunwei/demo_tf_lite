@@ -45,17 +45,14 @@ Dataset loading functions
 # Load dataset
 demo_dataset_dir    = "../dataset/training_datasets/demo_dataset_1s_0.5s"
 feature_data_fp     = os.path.join(demo_dataset_dir, 'demo_salsalite_features.npy')
-class_label_fp      = os.path.join(demo_dataset_dir, 'demo_class_labels.npy')
-doa_label_fp        = os.path.join(demo_dataset_dir, "demo_doa_labels.npy")
+gt_label_fp         = os.path.join(demo_dataset_dir, 'demo_gt_labels.npy')
 feature_dataset     = np.load(feature_data_fp, allow_pickle=True)
-class_gt_labels     = np.load(class_label_fp, allow_pickle=True)
-doa_gt_labels       = np.load(doa_label_fp, allow_pickle=True)
-single_array_list   = np.concatenate((class_gt_labels, doa_gt_labels), axis=-1)
+gt_labels           = np.load(gt_label_fp, allow_pickle=True)
 dataset_size        = len(feature_dataset)
 
 # Create dataset generator 
 def dataset_gen():
-    for d, l in zip(feature_dataset, single_array_list):
+    for d, l in zip(feature_dataset, gt_labels):
         yield (d,l)
 
 # Create the dataset class itself
@@ -64,7 +61,7 @@ dataset = tf.data.Dataset.from_generator(
     output_signature=(
         tf.TensorSpec(shape = feature_dataset.shape[1:],
                       dtype = tf.float32),
-        tf.TensorSpec(shape = single_array_list.shape[1:],
+        tf.TensorSpec(shape = gt_labels.shape[1:],
                       dtype = tf.float32)
     )
 )
@@ -181,10 +178,10 @@ for epoch_count in range(total_epochs):
                                val_dataset  = validation_dataset,
                                epoch_count  = epoch_count,
                                n_classes    = n_classes,
-                               n_val_iter   = int(val_size//batch_size))
+                               n_val_iter   = int(val_size//batch_size)) # SELD Metrics class
     
-    seld_error, error_rate, f_score, le_cd, lr_cd = seld_metrics.calc_csv_metrics()
-    train_stats.append([epoch_count + 1, seld_error, error_rate, f_score, le_cd, lr_cd])
+    seld_error, error_rate, f_score, le_cd, lr_cd = seld_metrics.calc_csv_metrics() # Get the SELD metrics
+    train_stats.append([epoch_count + 1, seld_error, error_rate, f_score, le_cd, lr_cd]) # Store metrics history
     
     # Check if lowest SELD Error
     min_SELD_error_array = min(train_stats, key = lambda x : x[1])
@@ -192,11 +189,12 @@ for epoch_count in range(total_epochs):
         best_performing_epoch_path = "../experiments/{}/seld_model/epoch_{}_seld_{:.3f}.h5".format(now, min_SELD_error_array[0], min_SELD_error_array[1])
         print("Best performing epoch : {}, SELD Error : {:.4f}".format(min_SELD_error_array[0], min_SELD_error_array[1]))
         salsa_lite_model.save_weights(best_performing_epoch_path, overwrite=True)
-   
+
+# Present the SELD metrics for the best performing model
 min_SELD_error_array = min(train_stats, key = lambda x : x[1])
 print("\nBest performing epoch : {}, SELD Error : {:.4f}".format(min_SELD_error_array[0], min_SELD_error_array[1]))
 
-# Currently saving the last epoch model
+# Currently saving the last epoch model and model history
 salsa_lite_model.save_weights('../experiments/{}/model_last.h5'.format(now))
 np.save('../experiments/{}/demo_model_hist.npy'.format(now), 
         salsa_lite_model.history, 
@@ -207,6 +205,7 @@ if is_inference:
     print("\n\nInfering on test set now...")
     # Inference Section on Test Set
     csv_data = []
+    print("Using the model from : {}".format(best_performing_epoch_path))
     salsa_lite_model.load_weights(best_performing_epoch_path)
     for x_test, y_test in tqdm(test_dataset, total = int(test_size//batch_size)):
         test_predictions = salsa_lite_model.predict(x_test, verbose = 0)
