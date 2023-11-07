@@ -21,9 +21,9 @@ import math
 def seld_loss(y_true, y_pred):
     """
     Assuming we our model takes in one input and outputs one concatenated array
-        - [sed_pred .... doa_pred]
-        - sed_pred -> n_classes
-        - doa_pred -> n_classes * 2 (x,y coordinates)
+        - y_pred/true = [sed .... doa]
+        - sed -> n_classes
+        - doa -> n_classes * 2 (x,y coordinates)
         
     From there, we calculate each loss seperately and compute a weighted loss
     

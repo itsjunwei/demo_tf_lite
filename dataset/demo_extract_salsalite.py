@@ -136,7 +136,7 @@ def extract_features(audio_dir,
             with h5py.File(feature_fn, 'w') as hf:
                 hf.create_dataset('feature', data=audio_feature, dtype=np.float32)
 
-def compute_scaler(feature_dir):
+def compute_scaler(feature_dir, upper_feat_dir=None):
     
     cls = feature_dir.split('/')[-1]
     n_feature_channels = 4
@@ -171,7 +171,10 @@ def compute_scaler(feature_dir):
     feature_mean = np.expand_dims(feature_mean, axis=1)
     feature_std = np.expand_dims(feature_std, axis=1)
 
-    scaler_path = os.path.join('./features/scalers', cls + '_feature_scaler.h5')
+    if upper_feat_dir is not None:
+        scaler_path = os.path.join(upper_feat_dir, 'scalers', cls + '_feature_scaler.h5')
+    else:
+        scaler_path = os.path.join(feature_dir, 'scalers', cls + '_feature_scaler.h5')
     with h5py.File(scaler_path, 'w') as hf:
         hf.create_dataset('mean', data=feature_mean, dtype=np.float32)
         hf.create_dataset('std', data=feature_std, dtype=np.float32)
