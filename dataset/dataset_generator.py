@@ -103,9 +103,8 @@ def load_file(filepath):
 
     Returns
     -------
-    features    (np.ndarray)  : SALSA-Lite Features
-    gt_class    (np.ndarray)  : Active class ground truth
-    gt_doa      (np.ndarray)  : Active DOA ground truth [x-directions ... y-directions]
+    features    (np.ndarray)  : SALSA-Lite Features (7, n_frames_in , freq_bins)
+    frame_gt    (np.ndarray)  : Ground truth labels for the audio file, (n_frames_out, n_classes * 3)
     """
     
     # Read the h5 file
@@ -121,14 +120,14 @@ def load_file(filepath):
 
     # Extract ground truth from the filename
     filename = filepath.split(os.sep)[-1] # filename  =  class_azimuth_idx.h5
-    gts = filename.split('_') # [class, azimuth, ... ]
+    gts = filename.split('_') # [class, azimuth, ... ] assumed the same for all frames in audio
     
     if gts[0] == "noise": # Everything is zero
         full_gt  = np.zeros(len(class_labels) * 3, dtype = np.float32)
         frame_gt = np.concatenate([full_gt] * n_frames_out, axis = 0)
         return features , frame_gt
 
-    full_gt = np.zeros(len(class_labels) * 3, dtype=np.float32)
+    full_gt = np.zeros( len(class_labels) * 3, dtype=np.float32)
     # One-hot class encoding
     class_idx = class_labels.index(gts[0])
     full_gt[class_idx] = 1
@@ -145,6 +144,8 @@ def load_file(filepath):
     azi_rad = np.deg2rad(gt_azi)
     full_gt[class_idx + len(class_labels)] = np.cos(azi_rad) # X-coordinate
     full_gt[class_idx + 2 * len(class_labels)] = np.sin(azi_rad) # Y-coordinate
+    # Produce the ground truth labels for a single frame, expand the frame dimensions later
+    full_gt = np.reshape(full_gt, (1, len(full_gt)))
     
     # Expand it such that it meets the required n_frames output
     frame_gt = np.concatenate([full_gt] * n_frames_out, axis=0)
@@ -153,12 +154,11 @@ def load_file(filepath):
 
 
 def create_dataset(feature_path_dir):
-    """Create dataset
+    """Create dataset arrays to be stored in .npy format later
 
     Returns:
-        data            : dataset of features 
-        class_labels    : dataset of active class ground truth labels
-        doa_labels      : dataset of doa ground truth labels
+        data      : dataset of features 
+        gt_labels : dataset of ground truth labels
     """
     data = []
     gt_labels = []
@@ -203,17 +203,16 @@ if __name__ == "__main__":
     # # Segment the audio first 
     # audio_upper_dir = segment_concat_audio(window_duration=ws,
     #                                        hop_duration=hs) # './_audio/cleaned_data_{}s_{}s/'.format(window_duration, hop_duration)
-    audio_upper_dir = './_audio/cleaned_data_{}s_{}s/'.format(ws, hs)
 
     # Next, we extract the features for the segmented audio clips
     classes = ['dog', 'impact', 'speech']
     feature_upper_dir = os.path.join('.' , '_features', 'features_{}s_{}s'.format(ws, hs))
-    for cls in classes:
-        audio_dir = os.path.join(audio_upper_dir, cls)
-        feature_dir = os.path.join(feature_upper_dir, cls)
-        os.makedirs(os.path.join(feature_upper_dir, 'scalers'), exist_ok=True)
-        extract_features(audio_dir, feature_dir)
-        compute_scaler(feature_dir, upper_feat_dir=feature_upper_dir)
+    # for cls in classes:
+    #     audio_dir = os.path.join(audio_upper_dir, cls)
+    #     feature_dir = os.path.join(feature_upper_dir, cls)
+    #     os.makedirs(os.path.join(feature_upper_dir, 'scalers'), exist_ok=True)
+    #     extract_features(audio_dir, feature_dir)
+    #     compute_scaler(feature_dir, upper_feat_dir=feature_upper_dir)
 
     # Create arrays for feature, ground truth labels dataset
     data , gt = create_dataset(feature_upper_dir)

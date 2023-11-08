@@ -378,7 +378,7 @@ class SELDMetrics(object):
         # Number of rows/frames where predictions == ground truth
         correct_sed = mask.sum()
         # Raw accuracy for SED
-        sed_accuracy = correct_sed / sed_pred.shape[0]
+        sed_accuracy = correct_sed / sed_pred.iloc[: , self.n_classes:self.n_classes*2].sum()
 
         # Extract DOA predictions (n_classes) , ground truths (n_classes)
         doa = data.iloc[: , self.n_classes*2 : ]
@@ -434,8 +434,9 @@ class SELDMetrics(object):
         lr_cd      = c_sed_c_doa/(c_sed_c_doa + c_sed_w_doa)
         seld_error = 0.25 * (error_rate + (1-f_score) + le_cd/180 + (1-lr_cd))
         # Raw Accuracy --> Ignore DOA Threshold
-        print("Raw Accuracy : {:.4f}, DOA Error for Correct Preds : {:.4f}".format(sed_accuracy, (c_sed_c_doa_total_doa_error/c_sed_c_doa)))
-        print("DOA Errors for Positive GT DOA : {:.4f} , Negative GT DOA : {:.4f}".format( sum(gt_postive_doa_err) / len(gt_postive_doa_err), sum(gt_negative_doa_err) / len(gt_negative_doa_err) ) ) 
-        print("SELD Error : {:.4f} , ER : {:.4f} , F1 : {:.4f}, LE : {:.4f}, LR : {:.4f}\n".format(seld_error, error_rate, f_score, le_cd, lr_cd))
+        print("Raw Accuracy (ignoring DOA threshold) : {:.3f}%")
+        print("DOA Error for Correct Predictions (SED + DOA) : {:.2f}".format(sed_accuracy, (c_sed_c_doa_total_doa_error/c_sed_c_doa)))
+        print("DOA Errors for Positive GT DOA : {:.2f} , Negative GT DOA : {:.2f}".format( sum(gt_postive_doa_err) / len(gt_postive_doa_err), sum(gt_negative_doa_err) / len(gt_negative_doa_err) ) ) 
+        print("SELD Error : {:.3f} , ER : {:.3f} , F1 : {:.3f}, LE : {:.3f}, LR : {:.3f}".format(seld_error, error_rate, f_score, le_cd, lr_cd))
         return seld_error, error_rate, f_score, le_cd, lr_cd
         

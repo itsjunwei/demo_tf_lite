@@ -334,11 +334,11 @@ def bigru_unit(x, add_dense=False):
     """
     
     # To do : check how to merge the final bigru
-    bigru1 = Bidirectional(GRU(units=256, return_sequences=True, merge_mode = 'concat', name="GRU1"), 
-                           name="BiGRU1")(x)
+    bigru1 = Bidirectional(GRU(units=256, return_sequences=True, name="GRU1"), 
+                           merge_mode = 'concat', name="BiGRU1")(x)
     bigru1 = Dropout(0.3)(bigru1)
-    bigru2 = Bidirectional(GRU(units=256, return_sequences=True, merge_mode = 'concat', name="GRU2"), 
-                           name="BiGRU2")(bigru1)
+    bigru2 = Bidirectional(GRU(units=256, return_sequences=True, name="GRU2"), 
+                           merge_mode = 'concat', name="BiGRU2")(bigru1)
 
     # Unsure about the cost/benefits of adding this layer
     if add_dense : bigru2 = TimeDistributed(Dense(256))(bigru2)

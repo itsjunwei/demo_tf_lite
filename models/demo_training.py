@@ -43,9 +43,11 @@ dataset_split = [0.6, 0.2, 0.2]
 Dataset loading functions
 """
 # Load dataset
-demo_dataset_dir    = "../dataset/training_datasets/demo_dataset_1s_0.5s"
+demo_dataset_dir    = "../dataset/training_datasets/demo_dataset_0.2s_0.1s"
 feature_data_fp     = os.path.join(demo_dataset_dir, 'demo_salsalite_features.npy')
 gt_label_fp         = os.path.join(demo_dataset_dir, 'demo_gt_labels.npy')
+print("Features taken from : {}, size : {:.2f} MB".format(feature_data_fp, os.path.getsize(feature_data_fp)/(1024*1024)))
+print("Labels taken from   : {}, size : {:.2f} MB".format(gt_label_fp, os.path.getsize(gt_label_fp)/(1024*1024)))
 feature_dataset     = np.load(feature_data_fp, allow_pickle=True)
 gt_labels           = np.load(gt_label_fp, allow_pickle=True)
 dataset_size        = len(feature_dataset)
@@ -159,7 +161,7 @@ TODO
     - Fix batch size limitation (GRU layer)
 """
 # Training Epochs
-total_epochs = 5
+total_epochs = 10
 # Store SELD Metrics
 train_stats = []
 os.makedirs('../experiments/{}/seld_model/'.format(now), exist_ok=True)
@@ -187,7 +189,7 @@ for epoch_count in range(total_epochs):
     min_SELD_error_array = min(train_stats, key = lambda x : x[1])
     if min_SELD_error_array[0] == epoch_count+1 : # Save the epoch model with lowest SELD Error
         best_performing_epoch_path = "../experiments/{}/seld_model/epoch_{}_seld_{:.3f}.h5".format(now, min_SELD_error_array[0], min_SELD_error_array[1])
-        print("Best performing epoch : {}, SELD Error : {:.4f}".format(min_SELD_error_array[0], min_SELD_error_array[1]))
+        print("Best performing epoch : {}, SELD Error : {:.4f}\n".format(min_SELD_error_array[0], min_SELD_error_array[1]))
         salsa_lite_model.save_weights(best_performing_epoch_path, overwrite=True)
 
 # Present the SELD metrics for the best performing model
