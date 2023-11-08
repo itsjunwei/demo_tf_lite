@@ -14,7 +14,10 @@ In order to feed the data into the model, we will use generators and the Tensorf
 Follow this instead... In the `dataset` folder, run `dataset_generator.py` with desired configurations. This file will handle the segmentation of the concatenated audio, the conversion of audio segments to SALSA-Lite features and the creation of the data/ground truth .npy files to feed into the model for training.
 
 ### Model Training
-In the `models` folder, just run `demo_training.py` and adjust the global settings accordingly. 
+In the `models` folder, just run `demo_training.py` and adjust the global settings at the top accordingly. 
+
+### Model Metrics
+In the `models` folder, in `loss_and_metrics.py`, you can find the losses and metrics used in the training/inference of the data. The loss used during training is the `seld_loss` and the `seld_metrics` class is used to calculate metrics. We use the `.calc_csv_metrics()` function to calculate the overall metrics (no csv is created during validation). 
 
 ### Inference
 TODO
