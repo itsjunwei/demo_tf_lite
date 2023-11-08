@@ -214,6 +214,7 @@ if __name__ == "__main__":
     #     extract_features(audio_dir, feature_dir)
     #     compute_scaler(feature_dir, upper_feat_dir=feature_upper_dir)
 
+    compute_full_scaler(upper_feat_dir=feature_upper_dir)
     # Create arrays for feature, ground truth labels dataset
     data , gt = create_dataset(feature_upper_dir)
 

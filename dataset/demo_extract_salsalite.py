@@ -183,6 +183,43 @@ def compute_scaler(feature_dir, upper_feat_dir=None):
     print('Features shape: {}'.format(afeature.shape))
     print('Scaler path: {}'.format(scaler_path))
 
+def compute_full_scaler(upper_feat_dir):
+    # initialize scaler
+    n_feature_channels = 4
+    scaler_dict = {}
+    for i_chan in np.arange(n_feature_channels):
+        scaler_dict[i_chan] = preprocessing.StandardScaler()
+        
+    for dir, dirname, filename in os.walk(upper_feat_dir):
+        if filename.endswith('.h5'):
+            fullfilename = os.path.join(dir, dirname, filename)
+            with h5py.File(fullfilename, 'r') as hf:
+                afeature = hf['feature'][:]  # (n_chanels, n_timesteps, n_features)
+                for i_chan in range(n_feature_channels):
+                    scaler_dict[i_chan].partial_fit(afeature[i_chan, :, :])  # (n_timesteps, n_features)
+            
+    # Extract mean and std
+    feature_mean = []
+    feature_std = []
+    for i_chan in range(n_feature_channels):
+        feature_mean.append(scaler_dict[i_chan].mean_)
+        feature_std.append(np.sqrt(scaler_dict[i_chan].var_))
+
+    feature_mean = np.array(feature_mean)
+    feature_std = np.array(feature_std)
+
+    # Expand dims for timesteps: (n_chanels, n_timesteps, n_features)
+    feature_mean = np.expand_dims(feature_mean, axis=1)
+    feature_std = np.expand_dims(feature_std, axis=1)
+
+    scaler_path = os.path.join(upper_feat_dir, 'scalers', 'full_feature_scaler.h5')
+    with h5py.File(scaler_path, 'w') as hf:
+        hf.create_dataset('mean', data=feature_mean, dtype=np.float32)
+        hf.create_dataset('std', data=feature_std, dtype=np.float32)
+
+    print('Features shape: {}'.format(afeature.shape))
+    print('Scaler path: {}'.format(scaler_path))
+
 
 if __name__ == "__main__":
     # Ensure that script working directory is same directory as the script
