@@ -197,14 +197,13 @@ if __name__ == "__main__":
     gc.collect()
     
     # Window, Hop duration in seconds 
-    ws = 0.2
-    hs = 0.1
+    ws = 0.4
+    hs = 0.2
     
     # Segment the audio first 
     audio_upper_dir = segment_concat_audio(window_duration=ws,
                                            hop_duration=hs,
-                                           add_wgn=True,
-                                           snr_db=20) # './_audio/cleaned_data_{}s_{}s/'.format(window_duration, hop_duration)
+                                           add_wgn=False) # './_audio/cleaned_data_{}s_{}s/'.format(window_duration, hop_duration)
 
     # Next, we extract the features for the segmented audio clips
     classes = ['dog', 'impact', 'speech']
@@ -216,7 +215,6 @@ if __name__ == "__main__":
         extract_features(audio_dir, feature_dir)
         compute_scaler(feature_dir, upper_feat_dir=feature_upper_dir)
 
-    compute_full_scaler(upper_feat_dir=feature_upper_dir)
     # Create arrays for feature, ground truth labels dataset
     data , gt = create_dataset(feature_upper_dir)
 

@@ -37,6 +37,7 @@ resnet_style = 'basic'
 n_classes = 3
 batch_size = 32 # fixed because the GRU layer cannot recognise new batch sizes (not sure why)
 dataset_split = [0.6, 0.2, 0.2]
+total_epochs = 20 # For training
 
 
 """
@@ -126,16 +127,29 @@ checkpoint = ModelCheckpoint("../experiments/salsalite_demo_{epoch:03d}_loss_{lo
 early = EarlyStopping(monitor="val_loss",
                       mode="min",
                       patience=5)
+class LR_schedule:
+    def __init__(self, total_epochs):
+        self.total_epochs = total_epochs
+    
+    def scheduler(self, epoch, lr):
+        """Learning rate schedule should be 3x10^-4 for the first 70% of epochs, and it should reduce to 
+        10^-4 for the remaining 30% of epochs. The purpose of this is to help the model converge faster
+        during the initial, higher learning rate, as well as to escape the local minima in the loss landscape.
+        The reduce learning rate is meant to help the model make smaller, more refined updates to its weights.
+        A smaller learning rate towards the end of training can also lead to more stable training, as the
+        updates to the weights become smaller."""
+        
+        if epoch < int(0.7 * self.total_epochs):
+            lr = 3e-4
+            return lr
+        else:
+            decay_per_epoch = (3e-4 - 1e-4) / (0.3 * self.total_epochs)
+            lr_decay = (epoch - int(0.7 * self.total_epochs)) * decay_per_epoch
+            lr = 3e-4 - lr_decay
+            return lr
 
-def scheduler(epoch, lr):
-    if epoch < 35:
-        lr = 3e-4
-        return lr
-    else:
-        lr = 1e-4
-        return lr
-
-schedule = LearningRateScheduler(scheduler)
+training_lr = LR_schedule(total_epochs = total_epochs)
+schedule = LearningRateScheduler(training_lr.scheduler)
 
 csv_logger = CSVLogger(filename = '../experiments/{}/training_demo.csv'.format(now), 
                        append=True)
@@ -160,8 +174,6 @@ As such, the progress bar will show xxx/unknown (if verbose = 1) and that is fin
 TODO
     - Fix batch size limitation (GRU layer)
 """
-# Training Epochs
-total_epochs = 10
 # Store SELD Metrics
 train_stats = []
 os.makedirs('../experiments/{}/seld_model/'.format(now), exist_ok=True)

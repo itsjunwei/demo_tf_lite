@@ -395,9 +395,11 @@ class SELDMetrics(object):
         total_Nref = 0 # Total number of frames with active classes
         sed_FN = 0 # Total SED False Negatives
         sed_FP = 0 # Total SED False Positives
+        sed_TP = 0 # Total SED True Positivse
         c_sed_w_doa = 0
 
-        for idx, is_sed in enumerate(mask):
+        # Loop through all predictions, while is_sed == True if it correct prediction for all classes
+        for idx in range(len(sed)):
             sed_p   = sed[idx][:self.n_classes] # SED Prediction for a timeframe
             sed_g   = sed[idx][self.n_classes:] # SED Ground Truth for that timeframe
             loc_FN  = np.logical_and(sed_g == 1, sed_p == 0).sum() # False Negatives for the timeframe
@@ -408,34 +410,35 @@ class SELDMetrics(object):
             total_Nref += sed_g.sum() # Num of active classes per timeframe
             sed_FP  += loc_FP.sum() 
             sed_FN  += loc_FN.sum()
-            if is_sed: # correct SED prediction across all classes
-                for class_idx in range(self.n_classes): # loop through the classes
-                    if int(sed_p[class_idx]) == 1: # since correct SED prediction (sed_p == 1, sed_g == 1)
-                        doa_diff = doa[idx][class_idx] - doa[idx][class_idx + self.n_classes] # DOA difference
-                        while doa_diff < -180 : doa_diff += 360
-                        while doa_diff >= 180 : doa_diff -= 360 # Limit to [-180, 180)
-                        doa_diff = np.abs(doa_diff) # Convert to absolute DOA difference
-                        lecd_doa_error += doa_diff # sum the total DOA errors for correct SED predictions
-                        if doa[idx][class_idx + self.n_classes] >= 0:
-                            gt_postive_doa_err.append(doa_diff)
-                        elif doa[idx][class_idx + self.n_classes] < 0:
-                            gt_negative_doa_err.append(doa_diff)
-                        if doa_diff <= self.doa_threshold: # Correct DOA prediction
-                            c_sed_c_doa += 1 # number of correct DOA and SED
-                            c_sed_c_doa_total_doa_error += np.abs(doa_diff) # DOA diff total for correct DOA and SED
-                        else:
-                            c_sed_w_doa += 1
+            tp_sed = np.logical_and(sed_p == 1 , sed_g == 1) # e.g. [True, False , True etc]
+            sed_TP += tp_sed.sum()
+            for class_idx, is_sed in enumerate(tp_sed):
+                if is_sed: # correct SED prediction
+                    doa_diff = doa[idx][class_idx] - doa[idx][class_idx + self.n_classes] # DOA difference
+                    while doa_diff < -180 : doa_diff += 360
+                    while doa_diff >= 180 : doa_diff -= 360 # Limit to [-180, 180)
+                    doa_diff = np.abs(doa_diff) # Convert to absolute DOA difference
+                    lecd_doa_error += doa_diff # sum the total DOA errors for correct SED predictions
+                    if doa[idx][class_idx + self.n_classes] >= 0:
+                        gt_postive_doa_err.append(doa_diff)
+                    elif doa[idx][class_idx + self.n_classes] < 0:
+                        gt_negative_doa_err.append(doa_diff)
+                    if doa_diff <= self.doa_threshold: # Correct DOA prediction
+                        c_sed_c_doa += 1 # number of correct DOA and SED
+                        c_sed_c_doa_total_doa_error += np.abs(doa_diff) # DOA diff total for correct DOA and SED
+                    else:
+                        c_sed_w_doa += 1
                             
         
         # SELD Metrics of Error Rate, F-Score, Localization Error and Recall                    
         error_rate = (total_S + total_D + total_I) / (total_Nref)
         f_score    = c_sed_c_doa / (c_sed_c_doa + 0.5 * (sed_FN + sed_FP))
-        le_cd      = lecd_doa_error / correct_sed
+        le_cd      = lecd_doa_error / sed_TP
         lr_cd      = c_sed_c_doa/(c_sed_c_doa + c_sed_w_doa)
         seld_error = 0.25 * (error_rate + (1-f_score) + le_cd/180 + (1-lr_cd))
         # Raw Accuracy --> Ignore DOA Threshold
-        print("Raw Accuracy (ignoring DOA threshold) : {:.3f}%")
-        print("DOA Error for Correct Predictions (SED + DOA) : {:.2f}".format(sed_accuracy, (c_sed_c_doa_total_doa_error/c_sed_c_doa)))
+        print("Raw Accuracy (ignoring DOA threshold) : {:.2f}%".format(sed_TP*100/total_Nref))
+        print("DOA Error for Correct Predictions (SED + DOA) : {:.2f}".format(c_sed_c_doa_total_doa_error/c_sed_c_doa))
         print("DOA Errors for Positive GT DOA : {:.2f} , Negative GT DOA : {:.2f}".format( sum(gt_postive_doa_err) / len(gt_postive_doa_err), sum(gt_negative_doa_err) / len(gt_negative_doa_err) ) ) 
         print("SELD Error : {:.3f} , ER : {:.3f} , F1 : {:.3f}, LE : {:.3f}, LR : {:.3f}".format(seld_error, error_rate, f_score, le_cd, lr_cd))
         return seld_error, error_rate, f_score, le_cd, lr_cd
