@@ -55,10 +55,14 @@ def conv_block(x, out_channels):
                 )(x)
         x = BatchNormalization(axis=1)(x)
         x = ReLU()(x)
-
+    # x : (batch_size , n_channels , timebins , classes)
+    x = tf.transpose(x, [0, 3 , 2 , 1])
+    # x : (batch_size, classes , time_bins, n_channels)
     # Default Keras AveragePooling2D parameters will do
     x = AveragePooling2D(data_format='channels_first',
                          name = "avg_pool_init")(x)
+    # Convert back to channels first, (batch_size , n_channels , timebins , classes)
+    x = tf.transpose(x, [0, 3, 2 , 1])
     
     return x
 
@@ -127,9 +131,13 @@ def micro_resnet_block(x, out_channels, stride):
 
     # Stride = 2 actually does an average pooling on x
     if stride == 2:
+        x = tf.transpose(x, [0, 3, 2 , 1])
         x = AveragePooling2D(data_format='channels_first')(x)
-
+        x = tf.transpose(x, [0, 3, 2 , 1])
+        
+        identity = tf.transpose(x, [0, 3, 2 , 1])
         identity = AveragePooling2D(data_format='channels_first')(identity)
+        identity = tf.transpose(x, [0, 3, 2 , 1])
         identity = Conv2D(out_channels, 
                           kernel_size=1, 
                           strides=1, 
