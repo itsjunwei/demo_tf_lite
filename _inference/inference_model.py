@@ -59,8 +59,7 @@ def conv_block(x, out_channels):
     x = tf.transpose(x, [0, 3 , 2 , 1])
     # x : (batch_size, classes , time_bins, n_channels)
     # Default Keras AveragePooling2D parameters will do
-    x = AveragePooling2D(data_format='channels_first',
-                         name = "avg_pool_init")(x)
+    x = AveragePooling2D(name = "avg_pool_init")(x)
     # Convert back to channels first, (batch_size , n_channels , timebins , classes)
     x = tf.transpose(x, [0, 3, 2 , 1])
     
@@ -132,12 +131,12 @@ def micro_resnet_block(x, out_channels, stride):
     # Stride = 2 actually does an average pooling on x
     if stride == 2:
         x = tf.transpose(x, [0, 3, 2 , 1])
-        x = AveragePooling2D(data_format='channels_first')(x)
+        x = AveragePooling2D()(x)
         x = tf.transpose(x, [0, 3, 2 , 1])
         
-        identity = tf.transpose(x, [0, 3, 2 , 1])
-        identity = AveragePooling2D(data_format='channels_first')(identity)
-        identity = tf.transpose(x, [0, 3, 2 , 1])
+        identity = tf.transpose(identity, [0, 3, 2 , 1])
+        identity = AveragePooling2D()(identity)
+        identity = tf.transpose(identity, [0, 3, 2 , 1])
         identity = Conv2D(out_channels, 
                           kernel_size=1, 
                           strides=1, 
@@ -189,9 +188,13 @@ def micro_bottleneck_block(x, out_channels, stride, downsample_factor = 4):
     
     identity = x
     if stride == 2:
-        x = AveragePooling2D(data_format='channels_first')(x)
-
-        identity = AveragePooling2D(data_format='channels_first')(identity)
+        x = tf.transpose(x, [0, 3, 2 , 1])
+        x = AveragePooling2D()(x)
+        x = tf.transpose(x, [0, 3, 2 , 1])
+        
+        identity = tf.transpose(identity, [0, 3, 2 , 1])
+        identity = AveragePooling2D()(identity)
+        identity = tf.transpose(identity, [0, 3, 2 , 1])
         identity = Conv2D(out_channels, 
                           kernel_size=1, 
                           strides=1, 
@@ -257,9 +260,13 @@ def micro_dsc_block(x, out_channels, stride):
     identity = x
 
     if stride == 2:
-        x = AveragePooling2D(data_format='channels_first')(x)
-
-        identity = AveragePooling2D(data_format='channels_first')(identity)
+        x = tf.transpose(x, [0, 3, 2 , 1])
+        x = AveragePooling2D()(x)
+        x = tf.transpose(x, [0, 3, 2 , 1])
+        
+        identity = tf.transpose(identity, [0, 3, 2 , 1])
+        identity = AveragePooling2D()(identity)
+        identity = tf.transpose(identity, [0, 3, 2 , 1])
         identity = Conv2D(out_channels, 
                           kernel_size=1, 
                           strides=1, 
@@ -489,3 +496,15 @@ def get_model(input_shape,
                   name    = 'full_SALSALITE_model')
 
     return model
+
+if __name__ == "__main__":
+    resnet_style = 'basic'
+    n_classes = 3
+    input_shape = (7, 161, 95)
+    # Get the salsa-lite model
+    salsa_lite_model = get_model(input_shape    = input_shape, 
+                                resnet_style   = resnet_style, 
+                                n_classes      = n_classes,
+                                azi_only       = True,
+                                batch_size     = 1)
+    salsa_lite_model.summary()
