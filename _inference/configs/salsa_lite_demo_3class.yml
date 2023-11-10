@@ -1,0 +1,11 @@
+# Config to extract SALSA-Lite for demo with 3 classes
+data_dir: './data'
+feature_dir: './features'
+data:
+  format: 'mic'
+  fs: 48000 # re-recorded dataset is 48kHz
+  n_fft: 512 # increase fft point to mimic original salsa-lite input size
+  win_len: 512 # unused
+  hop_len: 300  # since we doubled fft point size, we double hop size accordingly as well
+  fmin_doa: 50  # Hz
+  fmax_doa: 4000 # Hz
