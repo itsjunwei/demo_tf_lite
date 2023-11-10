@@ -197,8 +197,8 @@ if __name__ == "__main__":
     gc.collect()
     
     # Window, Hop duration in seconds 
-    ws = 0.4
-    hs = 0.2
+    ws = 0.2
+    hs = 0.1
     
     # Segment the audio first 
     audio_upper_dir = segment_concat_audio(window_duration=ws,

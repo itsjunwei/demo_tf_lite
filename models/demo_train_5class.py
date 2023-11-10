@@ -230,7 +230,12 @@ salsa_lite_model.save_weights('../experiments/{}/model_last.h5'.format(now))
 np.save('../experiments/{}/demo_model_hist.npy'.format(now), 
         salsa_lite_model.history, 
         allow_pickle=True)
-
+# best_performing_epoch_path = "../experiments/20231109_1526/seld_model/epoch_20_seld_0.020.h5"
+# seld_metrics = SELDMetrics(model        = salsa_lite_model,
+#                                val_dataset  = validation_dataset,
+#                                epoch_count  = 1,
+#                                n_classes    = n_classes,
+#                                n_val_iter   = int(val_size//batch_size)) # SELD Metrics class
 is_inference = True
 if is_inference: 
     print("\n\nInfering on test set now...")
