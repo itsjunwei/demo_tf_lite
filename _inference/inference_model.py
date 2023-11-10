@@ -125,8 +125,9 @@ def micro_resnet_block(x, out_channels, stride):
 
     # Stride = 2 actually does an average pooling on x
     if stride == 2:
+        print(x.shape)
         x = AveragePooling2D()(x)
-
+        print(x.shape)
         identity = AveragePooling2D()(identity)
         identity = Conv2D(out_channels, 
                           kernel_size=1, 
@@ -293,12 +294,12 @@ def frequency_pooling(x, pooling_type='avg'):
 
     # The frequency axis is the last one
     if pooling_type == 'avg':
-        x = backend.mean(x , axis=-1)
+        x = backend.mean(x , axis=1)
     elif pooling_type == 'max':
-        x = backend.max(x, axis=-1)
+        x = backend.max(x, axis=1)
     elif pooling_type == 'avg_max':
-        x1 = backend.mean(x, axis=-1)
-        x2 = backend.max(x, axis=-1)
+        x1 = backend.mean(x, axis=1)
+        x2 = backend.max(x, axis=1)
         x = x1 + x2
 
     return x
@@ -452,11 +453,11 @@ def get_model(input_shape,
     channels = [64,128,256,512]
     strides = [1,2,2,2]
     for i in range(len(channels)):
-        input = resnet_block(input, channels[i], strides[i], resnet_style)
+        input = resnet_block(input, channels[i], strides[i], resnet_style) 
 
     # Decoding layers
     start_decoder = frequency_pooling(input)
-    start_decoder = tf.transpose(start_decoder, perm=[0,2,1])
+    # start_decoder = tf.transpose(start_decoder, perm=[0,2,1]) 
     bigru_output = bigru_unit(start_decoder)
 
     # Create output
@@ -474,7 +475,7 @@ def get_model(input_shape,
 if __name__ == "__main__":
     resnet_style = 'basic'
     n_classes = 3
-    input_shape = (7, 161, 95)
+    input_shape = (95, 161, 7) # HWC format now
     # Get the salsa-lite model
     salsa_lite_model = get_model(input_shape    = input_shape, 
                                 resnet_style   = resnet_style, 
