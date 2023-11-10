@@ -162,11 +162,9 @@ if __name__ == "__main__":
         except yaml.YAMLError as exc:
             print(exc)
     test_audio = np.random.rand(4,48000)
-    iterations = 500
-    
-    
+    iterations = 10
     start_time = time.time()
-    for i in range(500):
+    for i in range(iterations):
         test_feat = extract_features(test_audio)
     end_time = time.time()
     print("Time taken  : {}".format((end_time-start_time)/iterations))
