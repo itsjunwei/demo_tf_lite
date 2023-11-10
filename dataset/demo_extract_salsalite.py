@@ -28,6 +28,7 @@ def extract_features(audio_dir,
     Arguments
     -----------
     audio_dir   (filepath)  : .wav audio file to be read in (or whichever audio file format the mic input will be stored as)
+    feature_dir (filepath)  : filepath to where the features will be stored in
     data_config (.yml file) : filepath to the .yml config file used for SALSA-Lite
 
     Returns

@@ -156,6 +156,9 @@ def load_file(filepath):
 def create_dataset(feature_path_dir):
     """Create dataset arrays to be stored in .npy format later
 
+    Input:
+        feature_path_dir : filepath to where the features are stored in
+
     Returns:
         data      : dataset of features 
         gt_labels : dataset of ground truth labels

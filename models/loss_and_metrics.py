@@ -42,7 +42,7 @@ def seld_loss(y_true, y_pred):
     # first n_classes --> SED output
     # remaining --> DOA output for [x * n_classes ... y * n_classes]
 
-    n_classes = 3
+    n_classes = 3 # hard-coded for the demo
     sed_pred = y_pred[:, : , :n_classes]
     doa_pred = y_pred[:, : , n_classes:]
     
@@ -53,10 +53,10 @@ def seld_loss(y_true, y_pred):
                                    y_pred=sed_pred,
                                    from_logits=False)
 
-    doa_loss = masked_reg_loss_azimuth(event_frame_gt=sed_gt,
-                                       doa_frame_gt=doa_gt,
-                                       doa_frame_output=doa_pred,
-                                       n_classes=n_classes)
+    doa_loss = masked_reg_loss_azimuth(event_frame_gt   = sed_gt,
+                                       doa_frame_gt     = doa_gt,
+                                       doa_frame_output = doa_pred,
+                                       n_classes        = n_classes)
     
     # hardcoded for now
     weights = [0.3, 0.7]
@@ -203,11 +203,7 @@ def convert_xy_to_azimuth(array,
     azimuths[azimuths == 180] = -180
     
     return azimuths
-    # azimuths = np.arctan2(y_coords, x_coords)
-    # azimuth_deg = np.degrees(azimuths)
-    # azimuth_deg[azimuth_deg >= 180] -= 360 # Crop the azimuths to be [-180, 180)
-
-    # return azimuth_deg    
+  
 
 def get_angular_distance(azimuth_difference):
         """For an input absolute azimuth difference, returns the angular distance
@@ -335,13 +331,24 @@ class SELDMetrics(object):
         return _ER, _F1, LE_CD, LR_CD
     
     def calc_csv_metrics(self, filepath = None):
-        """Generate SELD Metrics from the predictions / ground truth that is stored in
-        csv format when calling the `update_seld_metrics()` function. Need to call this
-        function before using calc_csv_metrics(). 
+        """Generate SELD Metrics from the predictions / ground truth that is calculated from the
+        model that is used in this metrics class. Can pass through csv filepath if needed as well.
         
-        Differs from the `calculate_seld_metrics()` function in the sense that this uses
-        csv, pandas and numpy arrays to calculate. It should be more accurate since do not 
-        need to manipulate Tensors (unsure). The values will differ (also unsure why)"""
+        The metrics are hard coded for the demo itself. Also note that the way that the data is calculated,
+        it is not possible for the model to identify multiple instances of the same class in the same 
+        timeframe.
+        
+        Returns
+            seld_error : Aggregated SELD Error
+            error_rate : Average number of errors per timeframe with an active class
+            f_score    : Location-dependent F score
+            le_cd      : Class dependent localization error
+            lr_cd      : Class dependent localization recall
+        """
+        
+        # To prevent dividing by zero
+        eps = np.finfo(np.float).eps
+        
         if filepath is not None:
             data = pd.read_csv(filepath, header=None)
         else:
@@ -431,15 +438,15 @@ class SELDMetrics(object):
                             
         
         # SELD Metrics of Error Rate, F-Score, Localization Error and Recall                    
-        error_rate = (total_S + total_D + total_I) / (total_Nref)
-        f_score    = c_sed_c_doa / (c_sed_c_doa + 0.5 * (sed_FN + sed_FP))
-        le_cd      = lecd_doa_error / sed_TP
-        lr_cd      = c_sed_c_doa/(c_sed_c_doa + c_sed_w_doa)
+        error_rate = (total_S + total_D + total_I) / (total_Nref + eps)
+        f_score    = c_sed_c_doa / (c_sed_c_doa + 0.5 * (sed_FN + sed_FP) + eps)
+        le_cd      = lecd_doa_error / (sed_TP + eps)
+        lr_cd      = c_sed_c_doa/(c_sed_c_doa + c_sed_w_doa + eps)
         seld_error = 0.25 * (error_rate + (1-f_score) + le_cd/180 + (1-lr_cd))
         # Raw Accuracy --> Ignore DOA Threshold
-        print("Raw Accuracy (ignoring DOA threshold) : {:.2f}%".format(sed_TP*100/total_Nref))
-        print("DOA Error for Correct Predictions (SED + DOA) : {:.2f}".format(c_sed_c_doa_total_doa_error/c_sed_c_doa))
-        print("DOA Errors for Positive GT DOA : {:.2f} , Negative GT DOA : {:.2f}".format( sum(gt_postive_doa_err) / len(gt_postive_doa_err), sum(gt_negative_doa_err) / len(gt_negative_doa_err) ) ) 
+        print("Raw Accuracy (ignoring DOA threshold) : {:.2f}%".format(sed_TP*100/(total_Nref + eps)))
+        print("DOA Error for Correct Predictions (SED + DOA) : {:.2f}".format(c_sed_c_doa_total_doa_error/(c_sed_c_doa + eps)))
+        print("DOA Errors for Positive GT DOA : {:.2f} , Negative GT DOA : {:.2f}".format( sum(gt_postive_doa_err) / (len(gt_postive_doa_err) + eps), sum(gt_negative_doa_err) / (len(gt_negative_doa_err) + eps) ) ) 
         print("SELD Error : {:.3f} , ER : {:.3f} , F1 : {:.3f}, LE : {:.3f}, LR : {:.3f}".format(seld_error, error_rate, f_score, le_cd, lr_cd))
         return seld_error, error_rate, f_score, le_cd, lr_cd
         
