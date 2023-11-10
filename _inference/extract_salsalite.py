@@ -162,16 +162,25 @@ if __name__ == "__main__":
         except yaml.YAMLError as exc:
             print(exc)
     test_audio = np.random.rand(4,48000)
-    iterations = 10
-    start_time = time.time()
+    iterations = 100
+    
+    config_in = []
     for i in range(iterations):
+        start_time = time.time()
         test_feat = extract_features(test_audio)
-    end_time = time.time()
-    print("Time taken  : {}".format((end_time-start_time)/iterations))
-
-    start_time = time.time()
+        end_time = time.time()
+        time_taken = end_time-start_time
+        config_in.append(time_taken)
+    config_in = np.array(config_in)
+    print("Mean : {}, Variance : {}".format(np.mean(config_in), np.var(config_in)))
+    
+    config_out = []
     for i in range(iterations):
-        test_feat = extract_features(test_audio,cfg)
-    end_time = time.time()
-    print("Time taken  : {}".format((end_time-start_time)/iterations))
+        start_time = time.time()
+        test_feat = extract_features(test_audio, cfg)
+        end_time = time.time()
+        time_taken = end_time-start_time
+        config_out.append(time_taken)
+    config_out = np.array(config_out)
+    print("Mean : {}, Variance : {}".format(np.mean(config_out), np.var(config_out)))
     
