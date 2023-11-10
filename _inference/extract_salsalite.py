@@ -161,9 +161,10 @@ if __name__ == "__main__":
             cfg = yaml.safe_load(stream)
         except yaml.YAMLError as exc:
             print(exc)
+            
+    # Time test
     test_audio = np.random.rand(4,48000)
-    iterations = 100
-    
+    iterations = 10
     config_in = []
     for i in range(iterations):
         start_time = time.time()
@@ -182,5 +183,4 @@ if __name__ == "__main__":
         time_taken = end_time-start_time
         config_out.append(time_taken)
     config_out = np.array(config_out)
-    print("Mean : {}, Variance : {}".format(np.mean(config_out), np.var(config_out)))
-    
+    print("Mean : {}, Variance : {}".format(np.mean(config_out), np.var(config_out)))    
