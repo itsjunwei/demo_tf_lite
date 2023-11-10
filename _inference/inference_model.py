@@ -48,21 +48,16 @@ def conv_block(x, out_channels):
                 kernel_size=3,
                 strides=1,
                 padding='same',
-                data_format='channels_first',
                 use_bias=False,
                 kernel_initializer="glorot_uniform",
                 name = "conv_init_{}".format(subblock+1)
                 )(x)
         x = BatchNormalization(axis=1)(x)
         x = ReLU()(x)
-    # x : (batch_size , n_channels , timebins , classes)
-    x = tf.transpose(x, [0, 3 , 2 , 1])
-    # x : (batch_size, classes , time_bins, n_channels)
+
     # Default Keras AveragePooling2D parameters will do
     x = AveragePooling2D(name = "avg_pool_init")(x)
-    # Convert back to channels first, (batch_size , n_channels , timebins , classes)
-    x = tf.transpose(x, [0, 3, 2 , 1])
-    
+
     return x
 
 def resnet_block(x, out_channels, stride, resnet_style='basic'):
@@ -130,17 +125,12 @@ def micro_resnet_block(x, out_channels, stride):
 
     # Stride = 2 actually does an average pooling on x
     if stride == 2:
-        x = tf.transpose(x, [0, 3, 2 , 1])
         x = AveragePooling2D()(x)
-        x = tf.transpose(x, [0, 3, 2 , 1])
-        
-        identity = tf.transpose(identity, [0, 3, 2 , 1])
+
         identity = AveragePooling2D()(identity)
-        identity = tf.transpose(identity, [0, 3, 2 , 1])
         identity = Conv2D(out_channels, 
                           kernel_size=1, 
                           strides=1, 
-                          data_format='channels_first', 
                           use_bias=False)(identity)
         identity = BatchNormalization(axis=1)(identity)
     
@@ -148,7 +138,6 @@ def micro_resnet_block(x, out_channels, stride):
                 kernel_size=3,
                 strides=1,
                 padding='same',
-                data_format='channels_first',
                 use_bias=False,
                 kernel_initializer="glorot_uniform"
                 )(x)
@@ -159,7 +148,6 @@ def micro_resnet_block(x, out_channels, stride):
                 kernel_size=3,
                 strides=1,
                 padding='same',
-                data_format='channels_first',
                 use_bias=False,
                 kernel_initializer="glorot_uniform"
                 )(x)
@@ -188,17 +176,12 @@ def micro_bottleneck_block(x, out_channels, stride, downsample_factor = 4):
     
     identity = x
     if stride == 2:
-        x = tf.transpose(x, [0, 3, 2 , 1])
+
         x = AveragePooling2D()(x)
-        x = tf.transpose(x, [0, 3, 2 , 1])
-        
-        identity = tf.transpose(identity, [0, 3, 2 , 1])
         identity = AveragePooling2D()(identity)
-        identity = tf.transpose(identity, [0, 3, 2 , 1])
         identity = Conv2D(out_channels, 
                           kernel_size=1, 
                           strides=1, 
-                          data_format='channels_first', 
                           use_bias=False)(identity)
         identity = BatchNormalization(axis=1)(identity)
     
@@ -208,7 +191,6 @@ def micro_bottleneck_block(x, out_channels, stride, downsample_factor = 4):
                 kernel_size=1,
                 strides=1,
                 padding='same',
-                data_format='channels_first',
                 use_bias=False,
                 kernel_initializer="glorot_uniform"
                 )(x)
@@ -219,7 +201,6 @@ def micro_bottleneck_block(x, out_channels, stride, downsample_factor = 4):
                 kernel_size=3,
                 strides=1,
                 padding='same',
-                data_format='channels_first',
                 use_bias=False,
                 kernel_initializer="glorot_uniform"
                 )(x)
@@ -231,7 +212,6 @@ def micro_bottleneck_block(x, out_channels, stride, downsample_factor = 4):
                 kernel_size=1,
                 strides=1,
                 padding='same',
-                data_format='channels_first',
                 use_bias=False,
                 kernel_initializer="glorot_uniform"
                 )(x)
@@ -260,17 +240,13 @@ def micro_dsc_block(x, out_channels, stride):
     identity = x
 
     if stride == 2:
-        x = tf.transpose(x, [0, 3, 2 , 1])
+
         x = AveragePooling2D()(x)
-        x = tf.transpose(x, [0, 3, 2 , 1])
-        
-        identity = tf.transpose(identity, [0, 3, 2 , 1])
+
         identity = AveragePooling2D()(identity)
-        identity = tf.transpose(identity, [0, 3, 2 , 1])
         identity = Conv2D(out_channels, 
                           kernel_size=1, 
                           strides=1, 
-                          data_format='channels_first', 
                           use_bias=False)(identity)
         identity = BatchNormalization(axis=1)(identity)
 
@@ -279,14 +255,12 @@ def micro_dsc_block(x, out_channels, stride):
         x = DepthwiseConv2D(kernel_size=3,
                             strides=1,
                             padding='same',
-                            data_format='channels_first',
                             use_bias=False)(x)
 
         x = Conv2D(filters=out_channels,
                     kernel_size=1,
                     strides=1,
                     padding='same',
-                    data_format='channels_first',
                     use_bias=False,
                     kernel_initializer="glorot_uniform"
                     )(x)

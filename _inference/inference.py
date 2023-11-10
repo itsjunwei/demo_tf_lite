@@ -60,6 +60,9 @@ for i in range(iterations):
     start_time = time.time()
     features = extract_features(np.random.rand(4,48000)) # Feature shape of input_shape
     features = np.expand_dims(features, axis=0) # Need to expand dims to form batch size = 1
+    # Going from batch, n_channels, width, height to 
+    # batch, height , width, n_channels
+    features = np.transpose(features, [0, 3, 2, 1])
     predictions = salsa_lite_model.predict(features, verbose=0) # Get predictions of shape (1, 10 , 9) --> 10fps
     end_time = time.time()
     time_taken = end_time - start_time
