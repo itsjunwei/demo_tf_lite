@@ -42,7 +42,7 @@ salsa_lite_model.reset_states() # attempt to fix the stateful BIGRU
 
 
 """Load the pre-trained model"""
-trained_model_filepath = "./saved_models/test_model.h5"
+trained_model_filepath = "./saved_models/NHWC_model.h5"
 salsa_lite_model.load_weights(trained_model_filepath)
 
 
@@ -54,7 +54,8 @@ salsa_lite_model.load_weights(trained_model_filepath)
 #     pass
 
 """JW Testing the model processing speed here"""
-iterations = 100
+iterations = 200
+print("Testing for {} times".format(iterations))
 timings = [] # To calculate mean, variance
 for i in range(iterations):
     start_time = time.time()

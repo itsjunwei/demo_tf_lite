@@ -125,9 +125,9 @@ def micro_resnet_block(x, out_channels, stride):
 
     # Stride = 2 actually does an average pooling on x
     if stride == 2:
-        print(x.shape)
+
         x = AveragePooling2D()(x)
-        print(x.shape)
+
         identity = AveragePooling2D()(identity)
         identity = Conv2D(out_channels, 
                           kernel_size=1, 
