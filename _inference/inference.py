@@ -54,13 +54,15 @@ salsa_lite_model.load_weights(trained_model_filepath)
 #     pass
 
 """JW Testing the model processing speed here"""
-iterations = 200
+iterations = 1000
 print("Testing for {} times".format(iterations))
 timings = [] # To calculate mean, variance
+feature_timings = [] 
 for i in range(iterations):
     start_time = time.time()
-    features = extract_features(np.random.rand(4,48000)) # Feature shape of input_shape
+    features = extract_features(np.random.rand(4,9600)) # Feature shape of input_shape
     features = np.expand_dims(features, axis=0) # Need to expand dims to form batch size = 1
+    feat_time = time.time()
     # Going from batch, n_channels, width, height to 
     # batch, height , width, n_channels
     features = np.transpose(features, [0, 3, 2, 1])
@@ -68,7 +70,13 @@ for i in range(iterations):
     end_time = time.time()
     time_taken = end_time - start_time
     timings.append(time_taken)
+    extract_time = feat_time - start_time
+    feature_timings.append(extract_time)
     
 # Process timings 
 print("Mean time taken : {:.4f}s".format(np.mean(timings)))
 print("Variance time   : {:.4f}s".format(np.var(timings)))
+
+# Process timings 
+print("Feature Extraction mean time : {:.4f}s".format(np.mean(feature_timings)))
+print("Feature Extraction variance  : {:.4f}s".format(np.var(feature_timings)))
