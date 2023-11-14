@@ -15,6 +15,8 @@ from tqdm import tqdm
 import librosa
 import soundfile as sf
 import gc
+import yaml
+from sklearn import preprocessing
 
 def full_feature_with_norm(audio_dir,
                            feature_dir,
