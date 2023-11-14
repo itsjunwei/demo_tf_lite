@@ -75,7 +75,8 @@ val_size   = int(dataset_split[1] * dataset_size)
 test_size  = int(dataset_split[2] * dataset_size)
 
 # Shuffle the dataset before splitting
-shuffled_dataset = dataset.cache().shuffle(dataset_size)
+shuffled_dataset = dataset.cache().shuffle(dataset_size,
+                                           seed = 2023)
 
 # Create the training dataset, drop_remainder otherwise will throw error with irregular batch sizes
 train_dataset       = shuffled_dataset.take(train_size)
@@ -109,13 +110,14 @@ print("Batch size  : ", batch_size)
 print("Input shape : ", input_shape)
 
 # Get the salsa-lite model
-salsa_lite_model = iml.get_model(input_shape    = input_shape, 
-                             resnet_style   = resnet_style, 
-                             n_classes      = n_classes,
-                             azi_only       = True,
-                             batch_size     = batch_size)
+salsa_lite_model = iml.get_inference_model(input_shape    = input_shape,
+                                 resnet_style   = resnet_style,
+                                 n_classes      = n_classes,
+                                 azi_only       = True)
+"""Removed batch_size param in the model to allow for TF to infer the batch size itself.
+Hopefully fixes the issue"""
 salsa_lite_model.reset_states() # attempt to fix the stateful BIGRU
-# salsa_lite_model.summary()
+salsa_lite_model.summary()
 
 # Model Training Configurations
 checkpoint = ModelCheckpoint("../experiments/salsalite_demo_{epoch:03d}_loss_{loss:.4f}.h5",
@@ -126,7 +128,7 @@ checkpoint = ModelCheckpoint("../experiments/salsalite_demo_{epoch:03d}_loss_{lo
 
 early = EarlyStopping(monitor="val_loss",
                       mode="min",
-                      patience=5)
+                      patience=10)
 class LR_schedule:
     def __init__(self, total_epochs):
         self.total_epochs = total_epochs

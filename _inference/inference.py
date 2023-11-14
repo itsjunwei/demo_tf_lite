@@ -29,12 +29,12 @@ tf.keras.backend.clear_session()
 
 # Global model settings, put into configs / .yml file eventually
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
-resnet_style = 'basic'
+resnet_style = 'bottleneck'
 n_classes = 3
 
 # For JW testing
-window_duration_s = 0.4
-feature_len = int(window_duration_s * 10 * 20 + 1)
+window_duration_s = 0.2
+feature_len = int(window_duration_s * 10 * 16 + 1)
 
 input_shape = (95, feature_len, 7) # Height, Width , Channels shape
 # Get the salsa-lite model
@@ -47,7 +47,7 @@ salsa_lite_model.reset_states() # attempt to fix the stateful BIGRU
 
 
 """Load the pre-trained model"""
-trained_model_filepath = "./saved_models/NHWC_model.h5"
+trained_model_filepath = "./saved_models/bottleneck_w0.2s.h5"
 salsa_lite_model.load_weights(trained_model_filepath)
 
 

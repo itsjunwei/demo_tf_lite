@@ -447,6 +447,6 @@ class SELDMetrics(object):
         print("Raw Accuracy (ignoring DOA threshold) : {:.2f}%".format(sed_TP*100/(total_Nref + eps)))
         print("DOA Error for Correct Predictions (SED + DOA) : {:.2f}".format(c_sed_c_doa_total_doa_error/(c_sed_c_doa + eps)))
         print("DOA Errors for Positive GT DOA : {:.2f} , Negative GT DOA : {:.2f}".format( sum(gt_postive_doa_err) / (len(gt_postive_doa_err) + eps), sum(gt_negative_doa_err) / (len(gt_negative_doa_err) + eps) ) ) 
-        print("SELD Error : {:.3f} , ER : {:.3f} , F1 : {:.3f}, LE : {:.3f}, LR : {:.3f}".format(seld_error, error_rate, f_score, le_cd, lr_cd))
+        print("SELD Error : {:.4f} , ER : {:.4f} , F1 : {:.4f}, LE : {:.4f}, LR : {:.4f}".format(seld_error, error_rate, f_score, le_cd, lr_cd))
         return seld_error, error_rate, f_score, le_cd, lr_cd
         

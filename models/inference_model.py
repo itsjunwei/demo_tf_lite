@@ -353,7 +353,7 @@ def sed_fcn(x, n_classes=3):
     x = ReLU(name = 'sed_relu')(x)
     x = Dropout(0.2)(x)
     x = Dense(n_classes, name='event_frame_logits')(x)
-    x = Activation('sigmoid', name='event_pred')(x)
+    x = Activation('sigmoid', name='sed_sigmoid_out')(x)
 
     # (batch_size, time_steps, n_classes)
     return x
@@ -406,7 +406,7 @@ def doa_fcn(input, azi_only=False, n_classes=3):
     
     return doa_output
 
-def get_model(input_shape, 
+def get_inference_model(input_shape, 
               resnet_style='basic', 
               n_classes=3, 
               azi_only = False, 
@@ -442,7 +442,6 @@ def get_model(input_shape,
     
     # Create input of salsa-lite features
     inputs = Input(shape      = input_shape,
-                   batch_size = batch_size,
                    name       = "salsa_lite_features", 
                    sparse     = False)
     
@@ -481,7 +480,7 @@ if __name__ == "__main__":
     n_classes = 3
     input_shape = (95, 161, 7) # HWC format now
     # Get the salsa-lite model
-    salsa_lite_model = get_model(input_shape    = input_shape, 
+    salsa_lite_model = get_inference_model(input_shape    = input_shape, 
                                 resnet_style   = resnet_style, 
                                 n_classes      = n_classes,
                                 azi_only       = True,
