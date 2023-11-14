@@ -16,6 +16,7 @@ features/
 features_upvolume/
 outputs/
 dataset/data
+dataset/demo_experiment
 dataset/meta
 dataset/cleaned_data*
 dataset/cleaned_data_upvolume
