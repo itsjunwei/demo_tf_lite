@@ -14,7 +14,7 @@ import pandas as pd
 import os 
 import gc
 import tensorflow as tf
-import logging
+import inference_model as iml
 from keras.callbacks import ModelCheckpoint, EarlyStopping, LearningRateScheduler, CSVLogger, TensorBoard, Callback
 from datetime import datetime
 now = datetime.now()
@@ -33,7 +33,7 @@ tf.keras.backend.clear_session()
 
 # Global model settings, put into configs / .yml file eventually
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
-resnet_style = 'basic'
+resnet_style = 'bottleneck'
 n_classes = 3
 batch_size = 32 # fixed because the GRU layer cannot recognise new batch sizes (not sure why)
 dataset_split = [0.6, 0.2, 0.2]
@@ -44,7 +44,7 @@ total_epochs = 20 # For training
 Dataset loading functions
 """
 # Load dataset
-demo_dataset_dir    = "../dataset/training_datasets/demo_dataset_0.2s_0.1s"
+demo_dataset_dir    = "../dataset/training_datasets/demo_dataset_0.4s_0.2s_NHWC"
 feature_data_fp     = os.path.join(demo_dataset_dir, 'demo_salsalite_features.npy')
 gt_label_fp         = os.path.join(demo_dataset_dir, 'demo_gt_labels.npy')
 print("Features taken from : {}, size : {:.2f} MB".format(feature_data_fp, os.path.getsize(feature_data_fp)/(1024*1024)))
@@ -109,7 +109,7 @@ print("Batch size  : ", batch_size)
 print("Input shape : ", input_shape)
 
 # Get the salsa-lite model
-salsa_lite_model = get_model(input_shape    = input_shape, 
+salsa_lite_model = iml.get_model(input_shape    = input_shape, 
                              resnet_style   = resnet_style, 
                              n_classes      = n_classes,
                              azi_only       = True,

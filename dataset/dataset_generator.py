@@ -153,11 +153,13 @@ def load_file(filepath):
     return features , frame_gt
 
 
-def create_dataset(feature_path_dir):
+def create_dataset(feature_path_dir,
+                   for_cpu = False):
     """Create dataset arrays to be stored in .npy format later
 
     Input:
         feature_path_dir : filepath to where the features are stored in
+        for_cpu          : boolean. True if generating dataset for CPU usage in form of NHWC
 
     Returns:
         data      : dataset of features 
@@ -183,6 +185,8 @@ def create_dataset(feature_path_dir):
                 full_filepath = os.path.join(feature_dir, file)
                 salsa_features , gt_label = load_file(filepath=full_filepath)
                 salsa_features[:4] = (salsa_features[:4]-mean)/std
+                # Because for CPU, Tensorflow only operates on height (freq) , width (time) , channel shape
+                if for_cpu : salsa_features = np.transpose(salsa_features, [2,1,0])
                 data.append(salsa_features)
                 gt_labels.append(gt_label)
                 
@@ -199,36 +203,48 @@ if __name__ == "__main__":
     gc.enable()
     gc.collect()
     
+    # General Configs 
+    seperate_audio = False
+    create_features = False
+    generate_dataset = True
+    dataset_dir = "./training_datasets/demo_dataset_{}s_{}s_NHWC/".format(ws,hs)
+    concat_audio_dir = ".\data\Dataset_concatenated_tracks"
+    
     # Window, Hop duration in seconds 
-    ws = 0.4
-    hs = 0.2
+    ws = 0.2
+    hs = 0.1
     
     # Segment the audio first 
-    audio_upper_dir = segment_concat_audio(window_duration=ws,
-                                           hop_duration=hs,
-                                           add_wgn=False) # './_audio/cleaned_data_{}s_{}s/'.format(window_duration, hop_duration)
+    if seperate_audio: 
+        audio_upper_dir = segment_concat_audio(concat_data_dir = concat_audio_dir,
+                                               window_duration=ws,
+                                               hop_duration=hs,
+                                               add_wgn=False) 
+        # './_audio/cleaned_data_{}s_{}s/'.format(window_duration, hop_duration)
 
-    # Next, we extract the features for the segmented audio clips
+    # # Next, we extract the features for the segmented audio clips
     classes = ['dog', 'impact', 'speech']
     feature_upper_dir = os.path.join('.' , '_features', 'features_{}s_{}s'.format(ws, hs))
-    for cls in classes:
-        audio_dir = os.path.join(audio_upper_dir, cls)
-        feature_dir = os.path.join(feature_upper_dir, cls)
-        os.makedirs(os.path.join(feature_upper_dir, 'scalers'), exist_ok=True)
-        extract_features(audio_dir, feature_dir)
-        compute_scaler(feature_dir, upper_feat_dir=feature_upper_dir)
-
-    # Create arrays for feature, ground truth labels dataset
-    data , gt = create_dataset(feature_upper_dir)
-
-    # Create directories for storage
-    dataset_dir = "./training_datasets/demo_dataset_{}s_{}s/".format(ws,hs)
-    os.makedirs(dataset_dir, exist_ok=True)
-
-    feature_fp = os.path.join(dataset_dir, "demo_salsalite_features.npy")
-    np.save(feature_fp, data, allow_pickle=True)
-    print("Features saved at {}!".format(feature_fp))
     
-    gt_fp = os.path.join(dataset_dir, 'demo_gt_labels.npy')
-    np.save(gt_fp, gt, allow_pickle=True)
-    print("Active class ground truth saved at {}!".format(gt_fp))
+    if create_features:
+        for cls in classes:
+            audio_dir = os.path.join(audio_upper_dir, cls)
+            feature_dir = os.path.join(feature_upper_dir, cls)
+            os.makedirs(os.path.join(feature_upper_dir, 'scalers'), exist_ok=True)
+            extract_features(audio_dir, feature_dir)
+            compute_scaler(feature_dir, upper_feat_dir=feature_upper_dir)
+
+    if generate_dataset:
+        # Create arrays for feature, ground truth labels dataset
+        data , gt = create_dataset(feature_upper_dir, for_cpu = True)
+
+        # Create directories for storage
+        os.makedirs(dataset_dir, exist_ok=True)
+
+        feature_fp = os.path.join(dataset_dir, "demo_salsalite_features.npy")
+        np.save(feature_fp, data, allow_pickle=True)
+        print("Features saved at {}!".format(feature_fp))
+        
+        gt_fp = os.path.join(dataset_dir, 'demo_gt_labels.npy')
+        np.save(gt_fp, gt, allow_pickle=True)
+        print("Active class ground truth saved at {}!".format(gt_fp))
