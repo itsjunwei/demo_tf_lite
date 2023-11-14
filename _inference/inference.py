@@ -31,7 +31,12 @@ tf.keras.backend.clear_session()
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 resnet_style = 'basic'
 n_classes = 3
-input_shape = (95, 161, 7) # Height, Width , Channels shape
+
+# For JW testing
+window_duration_s = 0.4
+feature_len = int(window_duration_s * 10 * 20 + 1)
+
+input_shape = (95, feature_len, 7) # Height, Width , Channels shape
 # Get the salsa-lite model
 salsa_lite_model = get_model(input_shape    = input_shape, 
                              resnet_style   = resnet_style, 
@@ -60,7 +65,7 @@ timings = [] # To calculate mean, variance
 feature_timings = [] 
 for i in range(iterations):
     start_time = time.time()
-    features = extract_features(np.random.rand(4,9600)) # Feature shape of input_shape
+    features = extract_features(np.random.rand(4,int(window_duration_s * 48000))) # Feature shape of input_shape
     features = np.expand_dims(features, axis=0) # Need to expand dims to form batch size = 1
     feat_time = time.time()
     # Going from batch, n_channels, width, height to 
