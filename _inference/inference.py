@@ -54,6 +54,15 @@ def convert_xy_to_azimuth(array,
     
     return azimuths
 
+def local_scaling(x):
+    """Scaling an array to fit between -1 and 1"""
+    x_min = np.min(x)
+    x_max = np.max(x)
+    x_normed = (x - x_min) / (x_max - x_min)
+    x_scaled = 2 * x_normed - 1
+    
+    return x_scaled
+
 # Ensure that script working directory is same directory as the script
 abspath = os.path.abspath(__file__)
 dname = os.path.dirname(abspath)
@@ -68,11 +77,11 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 resnet_style = 'bottleneck'
 n_classes = 3
 fs = 48000
-trained_model_filepath = "./saved_models/bottleneck_w0.4s.h5"
+trained_model_filepath = "./saved_models/bottleneck_w0.2s.h5"
 
 # For JW testing
-window_duration_s = 0.5
-feature_len = int(window_duration_s * 10 * 16 + 1)
+window_duration_s = 0.2
+feature_len = int(window_duration_s * 10 * 16 + 1) # General FFT formula
 
 input_shape = (95, feature_len, 7) # Height, Width , Channels shape
 print("Input shape : ", input_shape)
@@ -127,15 +136,23 @@ print("Testing for {} times".format(iterations))
 timings = [] # To calculate mean, variance
 feature_timings = [] 
 for i in range(iterations):
+    random_audio = np.random.rand(4, int(window_duration_s * fs)) # Keep the generated audio out of the timer
+    
     start_time = time.time()
-    features = extract_features(np.random.rand(4,int(window_duration_s * fs))) # Feature shape of input_shape
+    
+    scaled_random_audio = local_scaling(random_audio) # Scale the audio to fit [-1, 1]
+    features = extract_features(scaled_random_audio) # Feature shape of input_shape
     features = np.expand_dims(features, axis=0) # Need to expand dims to form batch size = 1
+    
     feat_time = time.time()
+    
     # Going from batch, n_channels, width, height to 
     # batch, height , width, n_channels
     features = np.transpose(features, [0, 3, 2, 1])
     predictions = salsa_lite_model.predict(features, verbose=0) # Get predictions of shape (1, 10 , 9) --> 10fps
+    
     end_time = time.time()
+    
     time_taken = end_time - start_time
     timings.append(time_taken)
     extract_time = feat_time - start_time
