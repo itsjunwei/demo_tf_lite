@@ -44,7 +44,7 @@ total_epochs = 20 # For training
 Dataset loading functions
 """
 # Load dataset
-demo_dataset_dir    = "../dataset/training_datasets/demo_dataset_0.4s_0.2s_NHWC"
+demo_dataset_dir    = "../dataset/training_datasets/demo_dataset_0.5s_0.25s_NHWC_scaled"
 feature_data_fp     = os.path.join(demo_dataset_dir, 'demo_salsalite_features.npy')
 gt_label_fp         = os.path.join(demo_dataset_dir, 'demo_gt_labels.npy')
 print("Features taken from : {}, size : {:.2f} MB".format(feature_data_fp, os.path.getsize(feature_data_fp)/(1024*1024)))

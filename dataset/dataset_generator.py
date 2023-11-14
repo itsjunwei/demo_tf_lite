@@ -20,6 +20,7 @@ from sklearn import preprocessing
 
 def full_feature_with_norm(audio_dir,
                            feature_dir,
+                           cfg = None,
                            data_config: str = './configs/salsa_lite_demo_3class.yml'
                            ):
     """
@@ -28,12 +29,13 @@ def full_feature_with_norm(audio_dir,
         - 4 Log-linear spectrograms 
         - 3 Normalized Interchannel Phase Differences 
 
-    [This needs to be revised for the demo]
-    The frequency range of log-linear spectrogram is 0 to 9kHz.
+    We also perform the scaling (normalization) of the 4 Log-Power linear spectrograms locally,
+    without calculating the global mean or standard deviation
 
     Arguments
     -----------
-    audio_data (np.ndarray) : audio data from mic streaming (assuming it is 4 channels)
+    audio_dir (directory)   : folder where all the audio data is stored
+    feature_dir (directory) : folder where all the features should be stored
     cfg (array)             : array of configuration parameters (from .yml file)
     data_config (.yml file) : filepath to the .yml config file used for SALSA-Lite
 
@@ -357,7 +359,7 @@ if __name__ == "__main__":
     # Window, Hop duration in seconds 
     ws = 0.5
     hs = 0.25
-    seperate_audio = True
+    seperate_audio = False
     create_features = True
     generate_dataset = True
     # dataset_dir = "./training_datasets/demo_dataset_{}s_{}s_NHWC/".format(ws,hs)
@@ -371,7 +373,8 @@ if __name__ == "__main__":
                                                window_duration=ws,
                                                hop_duration=hs,
                                                add_wgn=False) 
-        # './_audio/cleaned_data_{}s_{}s/'.format(window_duration, hop_duration)
+    else:
+        audio_upper_dir = './_audio/cleaned_data_{}s_{}s/'.format(ws, hs)
 
     # # Next, we extract the features for the segmented audio clips
     classes = ['dog', 'impact', 'speech']

@@ -17,6 +17,7 @@ import tensorflow as tf
 from extract_salsalite import extract_features
 import time
 import librosa
+from tqdm import tqdm
 
 def remove_batch_dim(tens):
     """Remove the batch dimension from an input tensor or 3D array
@@ -77,10 +78,10 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 resnet_style = 'bottleneck'
 n_classes = 3
 fs = 48000
-trained_model_filepath = "./saved_models/bottleneck_w0.2s.h5"
+trained_model_filepath = "./saved_models/bottleneck_w0.5s_scaled.h5"
 
 # For JW testing
-window_duration_s = 0.2
+window_duration_s = 0.5
 feature_len = int(window_duration_s * 10 * 16 + 1) # General FFT formula
 
 input_shape = (95, feature_len, 7) # Height, Width , Channels shape
@@ -99,29 +100,31 @@ print("Loading model from : ", trained_model_filepath)
 salsa_lite_model.load_weights(trained_model_filepath)
 
 """Creating and predicting simulated data"""
-# audio_fp = "./saved_models/test_0.001var.wav"
-# audio_data, _ = librosa.load(audio_fp, sr=fs, mono=False, dtype=np.float32)
-# frames = librosa.util.frame(audio_data, 
-#                             frame_length=int(window_duration_s*fs), 
-#                             hop_length=int(0.5*window_duration_s*fs))
-# frames = frames.T
-# pred_data = []
-# for frame in frames:
-#     four_channel = frame.T
-#     feature = extract_features(four_channel)
-#     feature = np.expand_dims(feature, axis = 0)
-#     feature = np.transpose(feature, [0, 3, 2, 1])
+audio_fp = "./saved_models/test.wav"
+audio_data, _ = librosa.load(audio_fp, sr=fs, mono=False, dtype=np.float32)
+frames = librosa.util.frame(audio_data, 
+                            frame_length=int(window_duration_s * fs), 
+                            hop_length=int(window_duration_s * fs))
+frames = frames.T
+print(frames.shape)
+pred_data = []
+for frame in frames:
+    four_channel = frame.T
+    feature = extract_features(four_channel)
+    feature = np.expand_dims(feature, axis = 0)
+    feature = np.transpose(feature, [0, 3, 2, 1])
 
-#     predictions = salsa_lite_model.predict(feature, verbose=0)
-#     sed_pred = remove_batch_dim(np.array(predictions[:, :, :n_classes]))
-#     sed_pred = (sed_pred > 0.7).astype(int)  
-#     azi_pred = convert_xy_to_azimuth(remove_batch_dim(np.array(predictions[:, : , n_classes:])))
-#     for i in range(len(sed_pred)):
-#         output = np.concatenate([sed_pred[i], azi_pred[i]], axis=-1)
-#         pred_data.append(output.flatten())
+    predictions = salsa_lite_model.predict(feature, verbose=0)
+    sed_pred = remove_batch_dim(np.array(predictions[:, :, :n_classes]))
+    sed_pred = (sed_pred > 0.3).astype(int)  
+    azi_pred = convert_xy_to_azimuth(remove_batch_dim(np.array(predictions[:, : , n_classes:])))
+    for i in range(len(sed_pred)):
+        final_azi_pred = sed_pred[i] * azi_pred[i]
+        output = np.concatenate([sed_pred[i], final_azi_pred], axis=-1)
+        pred_data.append(output.flatten())
         
-# df = pd.DataFrame(pred_data)
-# df.to_csv('./test.csv', index=False, header=False)
+df = pd.DataFrame(pred_data)
+df.to_csv('./test.csv', index=False, header=False)
     
 """Implement streaming into audio reading here"""
 # while True:
@@ -131,37 +134,37 @@ salsa_lite_model.load_weights(trained_model_filepath)
 #     pass
 
 """JW Testing the model processing speed here"""
-iterations = 1000
-print("Testing for {} times".format(iterations))
-timings = [] # To calculate mean, variance
-feature_timings = [] 
-for i in range(iterations):
-    random_audio = np.random.rand(4, int(window_duration_s * fs)) # Keep the generated audio out of the timer
+# iterations = 1000
+# print("Testing for {} times".format(iterations))
+# timings = [] # To calculate mean, variance
+# feature_timings = [] 
+# for i in range(iterations):
+#     random_audio = np.random.rand(4, int(window_duration_s * fs)) # Keep the generated audio out of the timer
     
-    start_time = time.time()
+#     start_time = time.time()
     
-    scaled_random_audio = local_scaling(random_audio) # Scale the audio to fit [-1, 1]
-    features = extract_features(scaled_random_audio) # Feature shape of input_shape
-    features = np.expand_dims(features, axis=0) # Need to expand dims to form batch size = 1
+#     scaled_random_audio = local_scaling(random_audio) # Scale the audio to fit [-1, 1]
+#     features = extract_features(scaled_random_audio) # Feature shape of input_shape
+#     features = np.expand_dims(features, axis=0) # Need to expand dims to form batch size = 1
     
-    feat_time = time.time()
+#     feat_time = time.time()
     
-    # Going from batch, n_channels, width, height to 
-    # batch, height , width, n_channels
-    features = np.transpose(features, [0, 3, 2, 1])
-    predictions = salsa_lite_model.predict(features, verbose=0) # Get predictions of shape (1, 10 , 9) --> 10fps
+#     # Going from batch, n_channels, width, height to 
+#     # batch, height , width, n_channels
+#     features = np.transpose(features, [0, 3, 2, 1])
+#     predictions = salsa_lite_model.predict(features, verbose=0) # Get predictions of shape (1, 10 , 9) --> 10fps
     
-    end_time = time.time()
+#     end_time = time.time()
     
-    time_taken = end_time - start_time
-    timings.append(time_taken)
-    extract_time = feat_time - start_time
-    feature_timings.append(extract_time)
+#     time_taken = end_time - start_time
+#     timings.append(time_taken)
+#     extract_time = feat_time - start_time
+#     feature_timings.append(extract_time)
     
-# Process timings 
-print("Mean time taken : {:.4f}s".format(np.mean(timings)))
-print("Variance time   : {:.4f}s".format(np.var(timings)))
+# # Process timings 
+# print("Mean time taken : {:.4f}s".format(np.mean(timings)))
+# print("Variance time   : {:.4f}s".format(np.var(timings)))
 
-# Process timings 
-print("Feature Extraction mean time : {:.4f}s".format(np.mean(feature_timings)))
-print("Feature Extraction variance  : {:.4f}s".format(np.var(feature_timings)))
+# # Process timings 
+# print("Feature Extraction mean time : {:.4f}s".format(np.mean(feature_timings)))
+# print("Feature Extraction variance  : {:.4f}s".format(np.var(feature_timings)))
