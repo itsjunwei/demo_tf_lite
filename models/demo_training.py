@@ -37,14 +37,14 @@ resnet_style = 'bottleneck'
 n_classes = 3
 batch_size = 32 # fixed because the GRU layer cannot recognise new batch sizes (not sure why)
 dataset_split = [0.6, 0.2, 0.2]
-total_epochs = 20 # For training
+total_epochs = 40 # For training
 
 
 """
 Dataset loading functions
 """
 # Load dataset
-demo_dataset_dir    = "../dataset/training_datasets/demo_dataset_0.5s_0.25s_NHWC_scaled"
+demo_dataset_dir    = "../dataset/training_datasets/demo_dataset_0.5s_0.25s_NHWC_scaled_with_noise"
 feature_data_fp     = os.path.join(demo_dataset_dir, 'demo_salsalite_features.npy')
 gt_label_fp         = os.path.join(demo_dataset_dir, 'demo_gt_labels.npy')
 print("Features taken from : {}, size : {:.2f} MB".format(feature_data_fp, os.path.getsize(feature_data_fp)/(1024*1024)))
@@ -159,7 +159,8 @@ csv_logger = CSVLogger(filename = '../experiments/{}/training_demo.csv'.format(n
 tensorboard_callback = TensorBoard(log_dir='../experiments/{}/logs'.format(now), 
                                    histogram_freq=1)
 
-callbacks_list = [checkpoint, early, tensorboard_callback, csv_logger, schedule]
+# callbacks_list = [checkpoint, early, tensorboard_callback, csv_logger, schedule]
+callbacks_list = [tensorboard_callback, csv_logger, schedule] # Removed unneeded callbacks
 
 # Checking if GPU is being used
 print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
@@ -233,7 +234,8 @@ if is_inference:
         AZI_pred = convert_xy_to_azimuth(remove_batch_dim(np.array(test_predictions[:, : , n_classes:])))
 
         for i in range(len(SED_pred)):
-            output = np.concatenate([SED_pred[i], SED_gt[i], AZI_pred[i], AZI_gt[i]], axis=-1)
+            masked_azimuths = SED_pred[i] * AZI_pred[i]
+            output = np.concatenate([SED_pred[i], SED_gt[i], masked_azimuths, AZI_gt[i]], axis=-1)
             csv_data.append(output.flatten())
             
     df = pd.DataFrame(csv_data)

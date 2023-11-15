@@ -10,6 +10,15 @@ from sklearn import preprocessing
 import os
 import time
 
+def local_scaling(x):
+    """Scaling an array to fit between -1 and 1"""
+    x_min = np.min(x)
+    x_max = np.max(x)
+    x_normed = (x - x_min) / (x_max - x_min)
+    x_scaled = 2 * x_normed - 1
+    
+    return x_scaled
+
 def extract_features(audio_data,
                      cfg = None,
                      data_config: str = './configs/salsa_lite_demo_3class.yml'
@@ -92,7 +101,8 @@ def extract_features(audio_data,
     """
     log_specs = []
     for imic in np.arange(n_mics):
-        stft = librosa.stft(y=np.asfortranarray(audio_data[imic, :]), 
+        audio_mic_data = local_scaling(audio_data[imic, :]) 
+        stft = librosa.stft(y=np.asfortranarray(audio_mic_data), 
                             n_fft=n_fft, 
                             hop_length=hop_length,
                             center=True, 

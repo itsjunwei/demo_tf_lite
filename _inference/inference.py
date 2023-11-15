@@ -78,7 +78,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 resnet_style = 'bottleneck'
 n_classes = 3
 fs = 48000
-trained_model_filepath = "./saved_models/bottleneck_w0.5s_scaled.h5"
+trained_model_filepath = "./saved_models/bottleneck_w0.5s_scaled_with_noise.h5"
 
 # For JW testing
 window_duration_s = 0.5
@@ -100,7 +100,7 @@ print("Loading model from : ", trained_model_filepath)
 salsa_lite_model.load_weights(trained_model_filepath)
 
 """Creating and predicting simulated data"""
-audio_fp = "./saved_models/test.wav"
+audio_fp = "./_test_audio/test_add_ambience.wav"
 audio_data, _ = librosa.load(audio_fp, sr=fs, mono=False, dtype=np.float32)
 frames = librosa.util.frame(audio_data, 
                             frame_length=int(window_duration_s * fs), 
@@ -116,7 +116,7 @@ for frame in frames:
 
     predictions = salsa_lite_model.predict(feature, verbose=0)
     sed_pred = remove_batch_dim(np.array(predictions[:, :, :n_classes]))
-    sed_pred = (sed_pred > 0.3).astype(int)  
+    sed_pred = (sed_pred > 0.7).astype(int)  
     azi_pred = convert_xy_to_azimuth(remove_batch_dim(np.array(predictions[:, : , n_classes:])))
     for i in range(len(sed_pred)):
         final_azi_pred = sed_pred[i] * azi_pred[i]

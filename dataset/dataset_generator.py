@@ -143,31 +143,31 @@ def full_feature_with_norm(audio_dir,
             audio_feature = np.concatenate((log_specs, phase_vector), axis=0)
             audio_feature = audio_feature.astype(np.float32)
     
-    # Now we normalize the first 4 log power spectrogram channels of SALSALITE
-    n_feature_channels = 4
-    scaler_dict = {}
-    for i_chan in np.arange(n_feature_channels):
-        scaler_dict[i_chan] = preprocessing.StandardScaler()
-        scaler_dict[i_chan].partial_fit(audio_feature[i_chan, : , : ]) # (n_timesteps, n_features)
-        
-    # Extract mean and std
-    feature_mean = []
-    feature_std = []
-    for i_chan in range(n_feature_channels):
-        feature_mean.append(scaler_dict[i_chan].mean_)
-        feature_std.append(np.sqrt(scaler_dict[i_chan].var_))
+            # Now we normalize the first 4 log power spectrogram channels of SALSALITE
+            n_feature_channels = 4
+            scaler_dict = {}
+            for i_chan in np.arange(n_feature_channels):
+                scaler_dict[i_chan] = preprocessing.StandardScaler()
+                scaler_dict[i_chan].partial_fit(audio_feature[i_chan, : , : ]) # (n_timesteps, n_features)
+                
+            # Extract mean and std
+            feature_mean = []
+            feature_std = []
+            for i_chan in range(n_feature_channels):
+                feature_mean.append(scaler_dict[i_chan].mean_)
+                feature_std.append(np.sqrt(scaler_dict[i_chan].var_))
 
-    feature_mean = np.array(feature_mean)
-    feature_std = np.array(feature_std)
+            feature_mean = np.array(feature_mean)
+            feature_std = np.array(feature_std)
 
-    # Expand dims for timesteps: (n_chanels, n_timesteps, n_features)
-    feature_mean = np.expand_dims(feature_mean, axis=1)
-    feature_std = np.expand_dims(feature_std, axis=1)
-    audio_feature[:4] = (audio_feature[:4] - feature_mean)/feature_std
-        
-    feature_fn = os.path.join(feature_dir, file.replace('wav', 'h5'))
-    with h5py.File(feature_fn, 'w') as hf:
-        hf.create_dataset('feature', data=audio_feature, dtype=np.float32)
+            # Expand dims for timesteps: (n_chanels, n_timesteps, n_features)
+            feature_mean = np.expand_dims(feature_mean, axis=1)
+            feature_std = np.expand_dims(feature_std, axis=1)
+            audio_feature[:4] = (audio_feature[:4] - feature_mean)/feature_std
+                
+            feature_fn = os.path.join(feature_dir, file.replace('wav', 'h5'))
+            with h5py.File(feature_fn, 'w') as hf:
+                hf.create_dataset('feature', data=audio_feature, dtype=np.float32)
 
 
 def segment_concat_audio(concat_data_dir = "./data/Dataset_concatenated_tracks/",
@@ -277,6 +277,7 @@ def load_file(filepath):
     
     if gts[0] == "noise": # Everything is zero
         full_gt  = np.zeros(len(class_labels) * 3, dtype = np.float32)
+        full_gt = np.reshape(full_gt, (1, len(full_gt)))
         frame_gt = np.concatenate([full_gt] * n_frames_out, axis = 0)
         return features , frame_gt
 
@@ -294,7 +295,8 @@ def load_file(filepath):
         gt_azi = -90
     elif gt_azi == 210:
         gt_azi = -150
-    azi_rad = np.deg2rad(gt_azi)
+    # azi_rad = np.deg2rad(gt_azi)
+    azi_rad = gt_azi * np.pi / 180.0 # Convert to radian unit this way
     full_gt[class_idx + len(class_labels)] = np.cos(azi_rad) # X-coordinate
     full_gt[class_idx + 2 * len(class_labels)] = np.sin(azi_rad) # Y-coordinate
     # Produce the ground truth labels for a single frame, expand the frame dimensions later
@@ -320,24 +322,24 @@ def create_dataset(feature_path_dir,
     """
     data = []
     gt_labels = []
-    classes = ['dog', 'impact', 'speech']
+    classes = ['dog', 'impact', 'speech', 'noise']
     for cls in classes:
         feature_dir = os.path.join(feature_path_dir, cls)
         
-        # Get the class-wise mean and std.dev to normalize features
-        scaler_dir = os.path.join(feature_path_dir, 'scalers')
-        scaler_filepath = os.path.join(scaler_dir, '{}_feature_scaler.h5'.format(cls))
-        with h5py.File(scaler_filepath, 'r') as shf:
-            mean = shf['mean'][:]
-            std = shf['std'][:]
+        # # Get the class-wise mean and std.dev to normalize features
+        # scaler_dir = os.path.join(feature_path_dir, 'scalers')
+        # scaler_filepath = os.path.join(scaler_dir, '{}_feature_scaler.h5'.format(cls))
+        # with h5py.File(scaler_filepath, 'r') as shf:
+        #     mean = shf['mean'][:]
+        #     std = shf['std'][:]
             
         # Loop through features, add to database
         print("Generating dataset for : ", feature_dir)
-        for file in tqdm(os.listdir(feature_dir)):
+        for file in tqdm(sorted(os.listdir(feature_dir))):
             if file.endswith('.h5'):
                 full_filepath = os.path.join(feature_dir, file)
                 salsa_features , gt_label = load_file(filepath=full_filepath)
-                salsa_features[:4] = (salsa_features[:4]-mean)/std
+                # salsa_features[:4] = (salsa_features[:4]-mean)/std
                 # Because for CPU, Tensorflow only operates on height (freq) , width (time) , channel shape
                 if for_cpu : salsa_features = np.transpose(salsa_features, [2,1,0])
                 data.append(salsa_features)
@@ -360,10 +362,10 @@ if __name__ == "__main__":
     ws = 0.5
     hs = 0.25
     seperate_audio = False
-    create_features = True
+    create_features = False
     generate_dataset = True
     # dataset_dir = "./training_datasets/demo_dataset_{}s_{}s_NHWC/".format(ws,hs)
-    dataset_dir = "./training_datasets/demo_dataset_{}s_{}s_NHWC_scaled/".format(ws,hs)
+    dataset_dir = "./training_datasets/demo_dataset_{}s_{}s_NHWC_scaled_with_noise/".format(ws,hs)
     # concat_audio_dir = ".\data\Dataset_concatenated_tracks"
     concat_audio_dir = ".\data\scaled_audio"
     
@@ -376,15 +378,15 @@ if __name__ == "__main__":
     else:
         audio_upper_dir = './_audio/cleaned_data_{}s_{}s/'.format(ws, hs)
 
-    # # Next, we extract the features for the segmented audio clips
-    classes = ['dog', 'impact', 'speech']
+    # Next, we extract the features for the segmented audio clips
+
     feature_upper_dir = os.path.join('.' , '_features', 'features_{}s_{}s'.format(ws, hs))
     
     if create_features:
+        classes = ['dog', 'impact', 'speech', 'noise']
         for cls in classes:
             audio_dir = os.path.join(audio_upper_dir, cls)
             feature_dir = os.path.join(feature_upper_dir, cls)
-            os.makedirs(os.path.join(feature_upper_dir, 'scalers'), exist_ok=True)
             full_feature_with_norm(audio_dir, feature_dir)
 
     # Now we generate the entire dataset (features, labels) and store them in .npy files so that training
