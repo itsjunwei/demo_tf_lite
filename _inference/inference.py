@@ -8,7 +8,8 @@ To do:
     - Add logger
     - Global settings into .yml file
 """
-from inference_model import * 
+from inference_model import *
+from util_funcs import * 
 import pandas as pd
 import numpy as np
 import os 
@@ -21,51 +22,6 @@ from tqdm import tqdm
 from datetime import datetime
 now = datetime.now()
 now = now.strftime("%Y%m%d_%H%M")
-
-def remove_batch_dim(tens):
-    """Remove the batch dimension from an input tensor or 3D array
-    Assumes that the input is of shape (batch_size x frames_per_batch x n_classes)
-    
-    Combines the batches and returns (frames_total x n_classes)
-    """
-    # tens : (batch size, frames, n_classes)
-    full_frames = tens.shape[0] * tens.shape[1] # combine all batches
-    tens = tens.reshape(full_frames, tens.shape[2]) # should be (n_frames_total, n_classes) final
-    return tens
-
-def convert_xy_to_azimuth(array, 
-                          n_classes=3):
-    """Converting an array of X,Y predictions into an array of azimuths.
-    [x1, x2, ... , xn, y1, y2, ... , yn] into [azi1, azi2, ... , azin]
-    
-    Inputs:
-        array       : (np.ndarray) An array of X,Y predictions
-        n_classes   : (int) `n` or number of possible active classes. Code will
-                       manually set n_classes if it is incorrect.
-                       
-    Returns:
-        azimuth_deg : (np.ndarray) Array of azimuths in the range [-180, 180)"""
-        
-    if not array.shape[-1] == 2*n_classes:
-        print("Check  ", array.shape)
-        n_classes = array.shape[-1]//2
-        print("Manually setting n_classes to be half of last dim, ", n_classes)
-    
-    x_coords = array[: , :n_classes]
-    y_coords = array[: , n_classes:]
-    azimuths = np.around(np.arctan2(y_coords, x_coords) * 180.0 / np.pi)
-    azimuths[azimuths == 180] = -180
-    
-    return azimuths
-
-def local_scaling(x):
-    """Scaling an array to fit between -1 and 1"""
-    x_min = np.min(x)
-    x_max = np.max(x)
-    x_normed = (x - x_min) / (x_max - x_min)
-    x_scaled = 2 * x_normed - 1
-    
-    return x_scaled
 
 # Ensure that script working directory is same directory as the script
 abspath = os.path.abspath(__file__)
@@ -101,6 +57,7 @@ salsa_lite_model = get_model(input_shape    = input_shape,
 # print("Loading model from : ", trained_model_filepath)
 # salsa_lite_model.load_weights(trained_model_filepath)
 
+
 """Load the tflite model"""
 with open('./saved_models/tflite_model.tflite', 'rb') as fid:
     tflite_model = fid.read()
@@ -111,6 +68,7 @@ interpreter.allocate_tensors()
 # Get input and output tensors.
 input_details = interpreter.get_input_details()
 output_details = interpreter.get_output_details()
+
 
 """Converting and saving as TFLITE, only need to do this once"""
 # salsa_lite_model.save("./saved_models/tf_model")
@@ -130,38 +88,39 @@ output_details = interpreter.get_output_details()
 # input_details = interpreter.get_input_details()
 # output_details = interpreter.get_output_details()
 
+
 """TFLite creating and predicting simulated data"""
-audio_fp = "./_test_audio/test_add_ambience.wav"
-# audio_fp = r"G:\datasets\testfile_untrain\180degree.wav"
-audio_data, _ = librosa.load(audio_fp, sr=fs, mono=False, dtype=np.float32)
-frames = librosa.util.frame(audio_data, 
-                            frame_length=int(window_duration_s * fs), 
-                            hop_length=int(window_duration_s * fs))
-frames = frames.T
+# audio_fp = "./_test_audio/test_add_ambience.wav"
+# # audio_fp = r"G:\datasets\testfile_untrain\180degree.wav"
+# audio_data, _ = librosa.load(audio_fp, sr=fs, mono=False, dtype=np.float32)
+# frames = librosa.util.frame(audio_data, 
+#                             frame_length=int(window_duration_s * fs), 
+#                             hop_length=int(window_duration_s * fs))
+# frames = frames.T
 
-tflite_data = []
-for frame in frames:
-    four_channel = frame.T
-    feature = extract_features(four_channel)
-    feature = np.expand_dims(feature, axis = 0)
-    feature = np.transpose(feature, [0, 3, 2, 1])
+# tflite_data = []
+# for frame in frames:
+#     four_channel = frame.T
+#     feature = extract_features(four_channel)
+#     feature = np.expand_dims(feature, axis = 0)
+#     feature = np.transpose(feature, [0, 3, 2, 1])
 
-    # TFLite prediction
-    interpreter.set_tensor(input_details[0]['index'], feature)
-    interpreter.invoke()
-    output_data = interpreter.get_tensor(output_details[0]['index'])
+#     # TFLite prediction
+#     interpreter.set_tensor(input_details[0]['index'], feature)
+#     interpreter.invoke()
+#     output_data = interpreter.get_tensor(output_details[0]['index'])
     
-    sed_pred = remove_batch_dim(np.array(output_data[:, :, :n_classes]))
-    sed_pred = (sed_pred > 0.7).astype(int)  
-    azi_pred = convert_xy_to_azimuth(remove_batch_dim(np.array(output_data[:, : , n_classes:])))
-    for i in range(len(sed_pred)):
-        final_azi_pred = sed_pred[i] * azi_pred[i]
-        output = np.concatenate([sed_pred[i], final_azi_pred], axis=-1)
-        tflite_data.append(output.flatten())
+#     sed_pred = remove_batch_dim(np.array(output_data[:, :, :n_classes]))
+#     sed_pred = (sed_pred > 0.7).astype(int)  
+#     azi_pred = convert_xy_to_azimuth(remove_batch_dim(np.array(output_data[:, : , n_classes:])))
+#     for i in range(len(sed_pred)):
+#         final_azi_pred = sed_pred[i] * azi_pred[i]
+#         output = np.concatenate([sed_pred[i], final_azi_pred], axis=-1)
+#         tflite_data.append(output.flatten())
 
-df = pd.DataFrame(tflite_data)
-os.makedirs("./csv_outputs", exist_ok=True)
-df.to_csv("./csv_outputs/test_{}.csv".format(now), index=False, header=False)
+# df = pd.DataFrame(tflite_data)
+# os.makedirs("./csv_outputs", exist_ok=True)
+# df.to_csv("./csv_outputs/test_{}.csv".format(now), index=False, header=False)
 
 
 """Creating and predicting simulated data"""
@@ -208,12 +167,14 @@ df.to_csv("./csv_outputs/test_{}.csv".format(now), index=False, header=False)
 # df2 = pd.DataFrame(tflite_data)
 # df2.to_csv("./csv_outputs/test_2_{}.csv".format(now), index=False, header=False)
     
+    
 """Implement streaming into audio reading here"""
 # while True:
 #     # audio_data = read_mic(...)
 #     # features = extract_features(audio_data)
 #     # predictions = salsa_lite_model.predict(features)
 #     pass
+
 
 """JW Testing the model processing speed here"""
 # iterations = 1000
