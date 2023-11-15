@@ -18,6 +18,9 @@ from extract_salsalite import extract_features
 import time
 import librosa
 from tqdm import tqdm
+from datetime import datetime
+now = datetime.now()
+now = now.strftime("%Y%m%d_%H%M")
 
 def remove_batch_dim(tens):
     """Remove the batch dimension from an input tensor or 3D array
@@ -101,6 +104,7 @@ salsa_lite_model.load_weights(trained_model_filepath)
 
 """Creating and predicting simulated data"""
 audio_fp = "./_test_audio/test_add_ambience.wav"
+# audio_fp = r"G:\datasets\testfile_untrain\180degree.wav"
 audio_data, _ = librosa.load(audio_fp, sr=fs, mono=False, dtype=np.float32)
 frames = librosa.util.frame(audio_data, 
                             frame_length=int(window_duration_s * fs), 
@@ -124,7 +128,7 @@ for frame in frames:
         pred_data.append(output.flatten())
         
 df = pd.DataFrame(pred_data)
-df.to_csv('./test.csv', index=False, header=False)
+df.to_csv('./test_{}.csv'.format(now), index=False, header=False)
     
 """Implement streaming into audio reading here"""
 # while True:
