@@ -44,8 +44,8 @@ Dataset loading functions
 """
 # Load dataset
 demo_dataset_dir    = "./_test_audio/demo_dataset_0.5s_0.25s_NHWC_scaled_with_noise"
-feature_data_fp     = os.path.join(demo_dataset_dir, 'demo_salsalite_features.npy')
-gt_label_fp         = os.path.join(demo_dataset_dir, 'demo_gt_labels.npy')
+feature_data_fp     = os.path.join(demo_dataset_dir, 'demo_salsalite_features_1000.npy')
+gt_label_fp         = os.path.join(demo_dataset_dir, 'demo_gt_labels_1000.npy')
 print("Features taken from : {}, size : {:.2f} MB".format(feature_data_fp, os.path.getsize(feature_data_fp)/(1024*1024)))
 print("Labels taken from   : {}, size : {:.2f} MB".format(gt_label_fp, os.path.getsize(gt_label_fp)/(1024*1024)))
 feature_dataset     = np.load(feature_data_fp, allow_pickle=True)
@@ -106,7 +106,7 @@ seld_metrics = SELDMetrics(model        = salsa_lite_model,
                            epoch_count  = 1,
                            n_classes    = n_classes,
                            n_val_iter   = 1000)
-seld_error, error_rate, f_score, le_cd, lr_cd = seld_metrics.calc_csv_metrics() # Get the SELD metrics
+# seld_error, error_rate, f_score, le_cd, lr_cd = seld_metrics.calc_csv_metrics() # Get the SELD metrics
 
 
 """Inference with TFLite"""
@@ -239,37 +239,51 @@ seld_error, error_rate, f_score, le_cd, lr_cd = seld_metrics.calc_csv_metrics(fi
 
 
 """JW Testing the model processing speed here"""
-# iterations = 1000
-# print("Testing for {} times".format(iterations))
-# timings = [] # To calculate mean, variance
-# feature_timings = [] 
-# for i in range(iterations):
-#     random_audio = np.random.rand(4, int(window_duration_s * fs)) # Keep the generated audio out of the timer
+iterations = 1000
+print("Testing for {} times".format(iterations))
+tf_timings = [] # To calculate mean, variance
+feature_timings = [] 
+tflite_timings = []
+for i in range(iterations):
+    random_audio = np.random.rand(4, int(window_duration_s * fs)) # Keep the generated audio out of the timer
     
-#     start_time = time.time()
+    start_time = time.time()
     
-#     scaled_random_audio = local_scaling(random_audio) # Scale the audio to fit [-1, 1]
-#     features = extract_features(scaled_random_audio) # Feature shape of input_shape
-#     features = np.expand_dims(features, axis=0) # Need to expand dims to form batch size = 1
+    scaled_random_audio = local_scaling(random_audio) # Scale the audio to fit [-1, 1]
+    features = extract_features(scaled_random_audio) # Feature shape of input_shape
+    features = np.expand_dims(features, axis=0) # Need to expand dims to form batch size = 1
     
-#     feat_time = time.time()
+    feat_time = time.time()
     
-#     # Going from batch, n_channels, width, height to 
-#     # batch, height , width, n_channels
-#     features = np.transpose(features, [0, 3, 2, 1])
-#     predictions = salsa_lite_model.predict(features, verbose=0) # Get predictions of shape (1, 10 , 9) --> 10fps
+    # Going from batch, n_channels, width, height to 
+    # batch, height , width, n_channels
+    features = np.transpose(features, [0, 3, 2, 1])
     
-#     end_time = time.time()
+    prediction_start = time.time()
+    predictions = salsa_lite_model.predict(features, verbose=0) # Get predictions of shape (1, 10 , 9) --> 10fps
+    prediction_end = time.time()
     
-#     time_taken = end_time - start_time
-#     timings.append(time_taken)
-#     extract_time = feat_time - start_time
-#     feature_timings.append(extract_time)
+    tflite_start = time.time()
+    interpreter.set_tensor(input_details[0]['index'], features)
+    interpreter.invoke()
+    test_predictions = interpreter.get_tensor(output_details[0]['index'])
+    tflite_end = time.time()
     
-# # Process timings 
-# print("Mean time taken : {:.4f}s".format(np.mean(timings)))
-# print("Variance time   : {:.4f}s".format(np.var(timings)))
+    tensorflow_time_taken = prediction_end - prediction_start
+    tf_timings.append(tensorflow_time_taken)
+    extract_time = feat_time - start_time
+    feature_timings.append(extract_time)
+    tflite_time_taken = tflite_end - tflite_start
+    tflite_timings.append(tflite_time_taken)
+    
+# Process timings 
+print("Tensorflow inference mean time taken : {:.4f}s".format(np.mean(tf_timings)))
+print("Tensorflow inference variance time   : {:.4f}s".format(np.var(tf_timings)))
 
-# # Process timings 
-# print("Feature Extraction mean time : {:.4f}s".format(np.mean(feature_timings)))
-# print("Feature Extraction variance  : {:.4f}s".format(np.var(feature_timings)))
+# Process timings 
+print("TFLite inference mean time taken : {:.4f}s".format(np.mean(tflite_timings)))
+print("TFLite inference variance time   : {:.4f}s".format(np.var(tflite_timings)))
+
+# Process timings 
+print("Feature Extraction mean time : {:.4f}s".format(np.mean(feature_timings)))
+print("Feature Extraction variance  : {:.4f}s".format(np.var(feature_timings)))
