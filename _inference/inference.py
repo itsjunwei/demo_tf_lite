@@ -39,6 +39,36 @@ n_classes = 3
 fs = 48000
 trained_model_filepath = "./saved_models/bottleneck_w0.5s_scaled_with_noise.h5"
 
+"""
+Dataset loading functions
+"""
+# Load dataset
+demo_dataset_dir    = "./_test_audio/demo_dataset_0.5s_0.25s_NHWC_scaled_with_noise"
+feature_data_fp     = os.path.join(demo_dataset_dir, 'demo_salsalite_features.npy')
+gt_label_fp         = os.path.join(demo_dataset_dir, 'demo_gt_labels.npy')
+print("Features taken from : {}, size : {:.2f} MB".format(feature_data_fp, os.path.getsize(feature_data_fp)/(1024*1024)))
+print("Labels taken from   : {}, size : {:.2f} MB".format(gt_label_fp, os.path.getsize(gt_label_fp)/(1024*1024)))
+feature_dataset     = np.load(feature_data_fp, allow_pickle=True)
+gt_labels           = np.load(gt_label_fp, allow_pickle=True)
+dataset_size        = len(feature_dataset)
+
+# Create dataset generator 
+def dataset_gen():
+    for d, l in zip(feature_dataset, gt_labels):
+        yield (d,l)
+
+# Create the dataset class itself
+dataset = tf.data.Dataset.from_generator(
+    dataset_gen,
+    output_signature=(
+        tf.TensorSpec(shape = feature_dataset.shape[1:],
+                      dtype = tf.float32),
+        tf.TensorSpec(shape = gt_labels.shape[1:],
+                      dtype = tf.float32)
+    )
+)
+testing_dataset = dataset.shuffle(buffer_size=1000, seed=2023).take(1000).batch(batch_size = 1)
+
 # For JW testing
 window_duration_s = 0.5
 feature_len = int(window_duration_s * 10 * 16 + 1) # General FFT formula
@@ -54,8 +84,8 @@ salsa_lite_model = get_model(input_shape    = input_shape,
 
 
 """Load the pre-trained model"""
-# print("Loading model from : ", trained_model_filepath)
-# salsa_lite_model.load_weights(trained_model_filepath)
+print("Loading model from : ", trained_model_filepath)
+salsa_lite_model.load_weights(trained_model_filepath)
 
 
 """Load the tflite model"""
@@ -69,6 +99,38 @@ interpreter.allocate_tensors()
 input_details = interpreter.get_input_details()
 output_details = interpreter.get_output_details()
 
+
+"""Inference Tests with trained model"""
+seld_metrics = SELDMetrics(model        = salsa_lite_model,
+                           val_dataset  = testing_dataset,
+                           epoch_count  = 1,
+                           n_classes    = n_classes,
+                           n_val_iter   = 1000)
+seld_error, error_rate, f_score, le_cd, lr_cd = seld_metrics.calc_csv_metrics() # Get the SELD metrics
+
+
+"""Inference with TFLite"""
+tflite_prediction_data = []
+for x_test, y_test in tqdm(testing_dataset, total = 1000):
+    interpreter.set_tensor(input_details[0]['index'], x_test)
+    interpreter.invoke()
+    test_predictions = interpreter.get_tensor(output_details[0]['index'])
+    
+    SED_pred = remove_batch_dim(np.array(test_predictions[:, :, :n_classes]))
+    SED_gt   = remove_batch_dim(np.array(y_test[:, :, :n_classes]))
+    SED_pred = (SED_pred > 0.3).astype(int)      
+    
+    AZI_gt   = convert_xy_to_azimuth(remove_batch_dim(np.array(y_test[:, : , n_classes:])))
+    AZI_pred = convert_xy_to_azimuth(remove_batch_dim(np.array(test_predictions[:, : , n_classes:])))
+
+    for i in range(len(SED_pred)):
+        masked_azimuths = SED_pred[i] * AZI_pred[i]
+        output = np.concatenate([SED_pred[i], SED_gt[i], masked_azimuths, AZI_gt[i]], axis=-1)
+        tflite_prediction_data.append(output.flatten())
+df = pd.DataFrame(tflite_prediction_data)
+dfcsv_filepath = "./csv_outputs/inference_test.csv"
+df.to_csv(dfcsv_filepath, index=False, header=False)
+seld_error, error_rate, f_score, le_cd, lr_cd = seld_metrics.calc_csv_metrics(filepath = dfcsv_filepath)
 
 """Converting and saving as TFLITE, only need to do this once"""
 # salsa_lite_model.save("./saved_models/tf_model")
