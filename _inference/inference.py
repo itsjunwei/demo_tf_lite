@@ -95,14 +95,42 @@ salsa_lite_model = get_model(input_shape    = input_shape,
                              n_classes      = n_classes,
                              azi_only       = True,
                              batch_size     = 1)
-salsa_lite_model.reset_states() # attempt to fix the stateful BIGRU
 
 
 """Load the pre-trained model"""
-print("Loading model from : ", trained_model_filepath)
-salsa_lite_model.load_weights(trained_model_filepath)
+# print("Loading model from : ", trained_model_filepath)
+# salsa_lite_model.load_weights(trained_model_filepath)
 
-"""Creating and predicting simulated data"""
+"""Load the tflite model"""
+with open('./saved_models/tflite_model.tflite', 'rb') as fid:
+    tflite_model = fid.read()
+
+interpreter = tf.lite.Interpreter(model_content=tflite_model)
+interpreter.allocate_tensors()
+
+# Get input and output tensors.
+input_details = interpreter.get_input_details()
+output_details = interpreter.get_output_details()
+
+"""Converting and saving as TFLITE, only need to do this once"""
+# salsa_lite_model.save("./saved_models/tf_model")
+# converter = tf.lite.TFLiteConverter.from_saved_model("./saved_models/tf_model")
+# tflite_model = converter.convert()
+
+# with open('./saved_models/tflite_model.tflite' , 'wb') as f:
+#     f.write(tflite_model)
+    
+# with open('./saved_models/tflite_model.tflite', 'rb') as fid:
+#     tflite_model = fid.read()
+
+# interpreter = tf.lite.Interpreter(model_content=tflite_model)
+# interpreter.allocate_tensors()
+
+# # Get input and output tensors.
+# input_details = interpreter.get_input_details()
+# output_details = interpreter.get_output_details()
+
+"""TFLite creating and predicting simulated data"""
 audio_fp = "./_test_audio/test_add_ambience.wav"
 # audio_fp = r"G:\datasets\testfile_untrain\180degree.wav"
 audio_data, _ = librosa.load(audio_fp, sr=fs, mono=False, dtype=np.float32)
@@ -110,25 +138,75 @@ frames = librosa.util.frame(audio_data,
                             frame_length=int(window_duration_s * fs), 
                             hop_length=int(window_duration_s * fs))
 frames = frames.T
-print(frames.shape)
-pred_data = []
+
+tflite_data = []
 for frame in frames:
     four_channel = frame.T
     feature = extract_features(four_channel)
     feature = np.expand_dims(feature, axis = 0)
     feature = np.transpose(feature, [0, 3, 2, 1])
 
-    predictions = salsa_lite_model.predict(feature, verbose=0)
-    sed_pred = remove_batch_dim(np.array(predictions[:, :, :n_classes]))
+    # TFLite prediction
+    interpreter.set_tensor(input_details[0]['index'], feature)
+    interpreter.invoke()
+    output_data = interpreter.get_tensor(output_details[0]['index'])
+    
+    sed_pred = remove_batch_dim(np.array(output_data[:, :, :n_classes]))
     sed_pred = (sed_pred > 0.7).astype(int)  
-    azi_pred = convert_xy_to_azimuth(remove_batch_dim(np.array(predictions[:, : , n_classes:])))
+    azi_pred = convert_xy_to_azimuth(remove_batch_dim(np.array(output_data[:, : , n_classes:])))
     for i in range(len(sed_pred)):
         final_azi_pred = sed_pred[i] * azi_pred[i]
         output = np.concatenate([sed_pred[i], final_azi_pred], axis=-1)
-        pred_data.append(output.flatten())
-        
-df = pd.DataFrame(pred_data)
-df.to_csv('./test_{}.csv'.format(now), index=False, header=False)
+        tflite_data.append(output.flatten())
+
+df = pd.DataFrame(tflite_data)
+os.makedirs("./csv_outputs", exist_ok=True)
+df.to_csv("./csv_outputs/test_{}.csv".format(now), index=False, header=False)
+
+
+"""Creating and predicting simulated data"""
+# audio_fp = "./_test_audio/test_add_ambience.wav"
+# # audio_fp = r"G:\datasets\testfile_untrain\180degree.wav"
+# audio_data, _ = librosa.load(audio_fp, sr=fs, mono=False, dtype=np.float32)
+# frames = librosa.util.frame(audio_data, 
+#                             frame_length=int(window_duration_s * fs), 
+#                             hop_length=int(window_duration_s * fs))
+# frames = frames.T
+
+# pred_data = []
+# tflite_data = []
+# for frame in frames:
+#     four_channel = frame.T
+#     feature = extract_features(four_channel)
+#     feature = np.expand_dims(feature, axis = 0)
+#     feature = np.transpose(feature, [0, 3, 2, 1])
+
+#     interpreter.set_tensor(input_details[0]['index'], feature)
+#     interpreter.invoke()
+#     output_data = interpreter.get_tensor(output_details[0]['index'])
+#     sed_pred = remove_batch_dim(np.array(output_data[:, :, :n_classes]))
+#     sed_pred = (sed_pred > 0.7).astype(int)  
+#     azi_pred = convert_xy_to_azimuth(remove_batch_dim(np.array(output_data[:, : , n_classes:])))
+#     for i in range(len(sed_pred)):
+#         final_azi_pred = sed_pred[i] * azi_pred[i]
+#         output = np.concatenate([sed_pred[i], final_azi_pred], axis=-1)
+#         tflite_data.append(output.flatten())
+    
+
+#     predictions = salsa_lite_model.predict(feature, verbose=0)
+#     sed_pred = remove_batch_dim(np.array(predictions[:, :, :n_classes]))
+#     sed_pred = (sed_pred > 0.7).astype(int)  
+#     azi_pred = convert_xy_to_azimuth(remove_batch_dim(np.array(predictions[:, : , n_classes:])))
+#     for i in range(len(sed_pred)):
+#         final_azi_pred = sed_pred[i] * azi_pred[i]
+#         output = np.concatenate([sed_pred[i], final_azi_pred], axis=-1)
+#         pred_data.append(output.flatten())
+
+# df = pd.DataFrame(pred_data)
+# df.to_csv('./csv_outputs/test_{}.csv'.format(now), index=False, header=False)
+
+# df2 = pd.DataFrame(tflite_data)
+# df2.to_csv("./csv_outputs/test_2_{}.csv".format(now), index=False, header=False)
     
 """Implement streaming into audio reading here"""
 # while True:
