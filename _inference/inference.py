@@ -29,6 +29,7 @@ abspath = os.path.abspath(__file__)
 dname = os.path.dirname(abspath)
 print("Changing directory to : ", dname)
 os.chdir(dname)
+os.system('cls')
 # Clearing the memory seems to improve training speed
 gc.collect()
 tf.keras.backend.clear_session()
@@ -119,46 +120,26 @@ interpreter.allocate_tensors()
 input_details = interpreter.get_input_details()
 output_details = interpreter.get_output_details()
 
-"""Implement streaming into audio reading here"""
-channels = 4  # Number of audio channels
-device_index = 1  # Input device index (change to the desired input device)
-chunk_size = 500 # Number of frames per chunk
-buffer_size = 48 # Number of chunks to accumulate in the buffer
 
-# Initialize PyAudio
-audio = pyaudio.PyAudio()
+"""TFLite predicting and displaying SALSA-Lite features for all files in folder"""
+new_recorded_audio_dir = os.path.join('_test_audio', 'ambisonics_combined')
+for new_audio in os.listdir(new_recorded_audio_dir):
+    if new_audio.endswith('.wav'):
+        print(new_audio)
+        audio_fp = os.path.join(new_recorded_audio_dir, new_audio)
 
-# Open the audio input stream with the specified number of channels
-stream = audio.open(
-    format=pyaudio.paInt16,  # 16-bit PCM format
-    channels=channels,  # Set to 4 channels
-    rate=fs,
-    input=True,
-    input_device_index=device_index,
-    frames_per_buffer=chunk_size
-)
+        audio_data, _ = librosa.load(audio_fp, sr=fs, mono=False, dtype=np.float32)
+        frames = librosa.util.frame(audio_data, 
+                                    frame_length=int(window_duration_s * fs), 
+                                    hop_length=int(window_duration_s * fs))
+        frames = frames.T
 
-print("Streaming audio...")
-
-# Initialize a buffer to accumulate audio data
-audio_buffer = []
-
-try:
-    while True:
-        # Read a chunk of audio data from the stream
-        audio_chunk = stream.read(chunk_size)
-
-        # Convert the audio chunk into a NumPy array
-        audio_data = np.frombuffer(audio_chunk, dtype=np.int16).reshape(channels, -1)
-
-        # Append the chunk to the buffer
-        audio_buffer.append(audio_data)
-
-        # If the buffer is full, process its contents
-        if len(audio_buffer) == buffer_size:
-            # Stack the chunks in the buffer to create a larger data array
-            audio_data = np.concatenate(audio_buffer, axis=1)
-            feature = extract_features(audio_data)
+        tflite_data = []
+        for frame in frames:
+            four_channel = frame.T
+            feature = extract_features(four_channel)
+            feature_filename = new_audio.replace('.wav', '.npy')
+            np.save(os.path.join('./_features_display', feature_filename), feature, allow_pickle=True)
             feature = np.expand_dims(feature, axis = 0)
             feature = np.transpose(feature, [0, 3, 2, 1])
 
@@ -173,17 +154,11 @@ try:
             for i in range(len(sed_pred)):
                 final_azi_pred = sed_pred[i] * azi_pred[i]
                 output = np.concatenate([sed_pred[i], final_azi_pred], axis=-1)
-                print(output.flatten())
-                
-            # Clear the buffer
-            audio_buffer = []
-except KeyboardInterrupt:
-    print("Streaming stopped by user")
-    
-    
-stream.stop_stream()
-stream.close()
-audio.terminate()
+                tflite_data.append(output.flatten())
+
+        df = pd.DataFrame(tflite_data)
+        os.makedirs("./csv_outputs", exist_ok=True)
+        df.to_csv("./csv_outputs/test_{}".format(new_audio.replace('.wav', '.csv')), index=False, header=False)
 
 
 
@@ -218,40 +193,6 @@ audio.terminate()
 # dfcsv_filepath = "./csv_outputs/inference_test.csv"
 # df.to_csv(dfcsv_filepath, index=False, header=False)
 # seld_error, error_rate, f_score, le_cd, lr_cd = seld_metrics.calc_csv_metrics(filepath = dfcsv_filepath)
-
-
-"""TFLite creating and predicting simulated data"""
-# audio_fp = "./_test_audio/test_add_ambience.wav"
-# # audio_fp = r"G:\datasets\testfile_untrain\180degree.wav"
-# audio_data, _ = librosa.load(audio_fp, sr=fs, mono=False, dtype=np.float32)
-# frames = librosa.util.frame(audio_data, 
-#                             frame_length=int(window_duration_s * fs), 
-#                             hop_length=int(window_duration_s * fs))
-# frames = frames.T
-
-# tflite_data = []
-# for frame in frames:
-#     four_channel = frame.T
-#     feature = extract_features(four_channel)
-#     feature = np.expand_dims(feature, axis = 0)
-#     feature = np.transpose(feature, [0, 3, 2, 1])
-
-#     # TFLite prediction
-#     interpreter.set_tensor(input_details[0]['index'], feature)
-#     interpreter.invoke()
-#     output_data = interpreter.get_tensor(output_details[0]['index'])
-    
-#     sed_pred = remove_batch_dim(np.array(output_data[:, :, :n_classes]))
-#     sed_pred = (sed_pred > 0.7).astype(int)  
-#     azi_pred = convert_xy_to_azimuth(remove_batch_dim(np.array(output_data[:, : , n_classes:])))
-#     for i in range(len(sed_pred)):
-#         final_azi_pred = sed_pred[i] * azi_pred[i]
-#         output = np.concatenate([sed_pred[i], final_azi_pred], axis=-1)
-#         tflite_data.append(output.flatten())
-
-# df = pd.DataFrame(tflite_data)
-# os.makedirs("./csv_outputs", exist_ok=True)
-# df.to_csv("./csv_outputs/test_{}.csv".format(now), index=False, header=False)
 
 
 """Creating and predicting simulated data"""

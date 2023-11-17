@@ -17,6 +17,9 @@ import tensorflow as tf
 import inference_model as iml
 from keras.callbacks import ModelCheckpoint, EarlyStopping, LearningRateScheduler, CSVLogger, TensorBoard, Callback
 from datetime import datetime
+from augmentations import *
+
+
 now = datetime.now()
 now = now.strftime("%Y%m%d_%H%M")
 
@@ -68,6 +71,13 @@ dataset = tf.data.Dataset.from_generator(
                       dtype = tf.float32)
     )
 )
+
+"""# First, filter the dataset to keep only 70% of the images
+filtered_ds = ds.filter(lambda image, label: tf.py_function(func=random_bool, inp=[], Tout=tf.bool))
+
+# Then, apply the augmentation to the remaining images
+augmented_ds = filtered_ds.map(augment)
+ds = ds.concatenate(augmented_ds)"""
 
 # Get number of training, validation and test samples
 train_size = int(dataset_split[0] * dataset_size)
