@@ -20,6 +20,7 @@ import time
 import librosa
 from tqdm import tqdm
 from datetime import datetime
+import pyaudio
 now = datetime.now()
 now = now.strftime("%Y%m%d_%H%M")
 
@@ -42,32 +43,32 @@ trained_model_filepath = "./saved_models/bottleneck_w0.5s_scaled_with_noise.h5"
 """
 Dataset loading functions
 """
-# Load dataset
-demo_dataset_dir    = "./_test_audio/demo_dataset_0.5s_0.25s_NHWC_scaled_with_noise"
-feature_data_fp     = os.path.join(demo_dataset_dir, 'demo_salsalite_features_1000.npy')
-gt_label_fp         = os.path.join(demo_dataset_dir, 'demo_gt_labels_1000.npy')
-print("Features taken from : {}, size : {:.2f} MB".format(feature_data_fp, os.path.getsize(feature_data_fp)/(1024*1024)))
-print("Labels taken from   : {}, size : {:.2f} MB".format(gt_label_fp, os.path.getsize(gt_label_fp)/(1024*1024)))
-feature_dataset     = np.load(feature_data_fp, allow_pickle=True)
-gt_labels           = np.load(gt_label_fp, allow_pickle=True)
-dataset_size        = len(feature_dataset)
+# # Load dataset
+# demo_dataset_dir    = "./_test_audio/demo_dataset_0.5s_0.25s_NHWC_scaled_with_noise"
+# feature_data_fp     = os.path.join(demo_dataset_dir, 'demo_salsalite_features_1000.npy')
+# gt_label_fp         = os.path.join(demo_dataset_dir, 'demo_gt_labels_1000.npy')
+# print("Features taken from : {}, size : {:.2f} MB".format(feature_data_fp, os.path.getsize(feature_data_fp)/(1024*1024)))
+# print("Labels taken from   : {}, size : {:.2f} MB".format(gt_label_fp, os.path.getsize(gt_label_fp)/(1024*1024)))
+# feature_dataset     = np.load(feature_data_fp, allow_pickle=True)
+# gt_labels           = np.load(gt_label_fp, allow_pickle=True)
+# dataset_size        = len(feature_dataset)
 
-# Create dataset generator 
-def dataset_gen():
-    for d, l in zip(feature_dataset, gt_labels):
-        yield (d,l)
+# # Create dataset generator 
+# def dataset_gen():
+#     for d, l in zip(feature_dataset, gt_labels):
+#         yield (d,l)
 
-# Create the dataset class itself
-dataset = tf.data.Dataset.from_generator(
-    dataset_gen,
-    output_signature=(
-        tf.TensorSpec(shape = feature_dataset.shape[1:],
-                      dtype = tf.float32),
-        tf.TensorSpec(shape = gt_labels.shape[1:],
-                      dtype = tf.float32)
-    )
-)
-testing_dataset = dataset.shuffle(buffer_size=1000, seed=2023).take(1000).batch(batch_size = 1)
+# # Create the dataset class itself
+# dataset = tf.data.Dataset.from_generator(
+#     dataset_gen,
+#     output_signature=(
+#         tf.TensorSpec(shape = feature_dataset.shape[1:],
+#                       dtype = tf.float32),
+#         tf.TensorSpec(shape = gt_labels.shape[1:],
+#                       dtype = tf.float32)
+#     )
+# )
+# testing_dataset = dataset.shuffle(buffer_size=1000, seed=2023).take(1000).batch(batch_size = 1)
 
 # For JW testing
 window_duration_s = 0.5
@@ -88,50 +89,6 @@ print("Loading model from : ", trained_model_filepath)
 salsa_lite_model.load_weights(trained_model_filepath)
 
 
-"""Load the tflite model"""
-with open('./saved_models/tflite_model.tflite', 'rb') as fid:
-    tflite_model = fid.read()
-
-interpreter = tf.lite.Interpreter(model_content=tflite_model)
-interpreter.allocate_tensors()
-
-# Get input and output tensors.
-input_details = interpreter.get_input_details()
-output_details = interpreter.get_output_details()
-
-
-"""Inference Tests with trained model"""
-seld_metrics = SELDMetrics(model        = salsa_lite_model,
-                           val_dataset  = testing_dataset,
-                           epoch_count  = 1,
-                           n_classes    = n_classes,
-                           n_val_iter   = 1000)
-# seld_error, error_rate, f_score, le_cd, lr_cd = seld_metrics.calc_csv_metrics() # Get the SELD metrics
-
-
-"""Inference with TFLite"""
-tflite_prediction_data = []
-for x_test, y_test in tqdm(testing_dataset, total = 1000):
-    interpreter.set_tensor(input_details[0]['index'], x_test)
-    interpreter.invoke()
-    test_predictions = interpreter.get_tensor(output_details[0]['index'])
-    
-    SED_pred = remove_batch_dim(np.array(test_predictions[:, :, :n_classes]))
-    SED_gt   = remove_batch_dim(np.array(y_test[:, :, :n_classes]))
-    SED_pred = (SED_pred > 0.3).astype(int)      
-    
-    AZI_gt   = convert_xy_to_azimuth(remove_batch_dim(np.array(y_test[:, : , n_classes:])))
-    AZI_pred = convert_xy_to_azimuth(remove_batch_dim(np.array(test_predictions[:, : , n_classes:])))
-
-    for i in range(len(SED_pred)):
-        masked_azimuths = SED_pred[i] * AZI_pred[i]
-        output = np.concatenate([SED_pred[i], SED_gt[i], masked_azimuths, AZI_gt[i]], axis=-1)
-        tflite_prediction_data.append(output.flatten())
-df = pd.DataFrame(tflite_prediction_data)
-dfcsv_filepath = "./csv_outputs/inference_test.csv"
-df.to_csv(dfcsv_filepath, index=False, header=False)
-seld_error, error_rate, f_score, le_cd, lr_cd = seld_metrics.calc_csv_metrics(filepath = dfcsv_filepath)
-
 """Converting and saving as TFLITE, only need to do this once"""
 # salsa_lite_model.save("./saved_models/tf_model")
 # converter = tf.lite.TFLiteConverter.from_saved_model("./saved_models/tf_model")
@@ -149,6 +106,118 @@ seld_error, error_rate, f_score, le_cd, lr_cd = seld_metrics.calc_csv_metrics(fi
 # # Get input and output tensors.
 # input_details = interpreter.get_input_details()
 # output_details = interpreter.get_output_details()
+
+
+"""Load the tflite model"""
+with open('./saved_models/tflite_model.tflite', 'rb') as fid:
+    tflite_model = fid.read()
+
+interpreter = tf.lite.Interpreter(model_content=tflite_model)
+interpreter.allocate_tensors()
+
+# Get input and output tensors.
+input_details = interpreter.get_input_details()
+output_details = interpreter.get_output_details()
+
+"""Implement streaming into audio reading here"""
+channels = 4  # Number of audio channels
+device_index = 1  # Input device index (change to the desired input device)
+chunk_size = 500 # Number of frames per chunk
+buffer_size = 48 # Number of chunks to accumulate in the buffer
+
+# Initialize PyAudio
+audio = pyaudio.PyAudio()
+
+# Open the audio input stream with the specified number of channels
+stream = audio.open(
+    format=pyaudio.paInt16,  # 16-bit PCM format
+    channels=channels,  # Set to 4 channels
+    rate=fs,
+    input=True,
+    input_device_index=device_index,
+    frames_per_buffer=chunk_size
+)
+
+print("Streaming audio...")
+
+# Initialize a buffer to accumulate audio data
+audio_buffer = []
+
+try:
+    while True:
+        # Read a chunk of audio data from the stream
+        audio_chunk = stream.read(chunk_size)
+
+        # Convert the audio chunk into a NumPy array
+        audio_data = np.frombuffer(audio_chunk, dtype=np.int16).reshape(channels, -1)
+
+        # Append the chunk to the buffer
+        audio_buffer.append(audio_data)
+
+        # If the buffer is full, process its contents
+        if len(audio_buffer) == buffer_size:
+            # Stack the chunks in the buffer to create a larger data array
+            audio_data = np.concatenate(audio_buffer, axis=1)
+            feature = extract_features(audio_data)
+            feature = np.expand_dims(feature, axis = 0)
+            feature = np.transpose(feature, [0, 3, 2, 1])
+
+            # TFLite prediction
+            interpreter.set_tensor(input_details[0]['index'], feature)
+            interpreter.invoke()
+            output_data = interpreter.get_tensor(output_details[0]['index'])
+            
+            sed_pred = remove_batch_dim(np.array(output_data[:, :, :n_classes]))
+            sed_pred = (sed_pred > 0.7).astype(int)  
+            azi_pred = convert_xy_to_azimuth(remove_batch_dim(np.array(output_data[:, : , n_classes:])))
+            for i in range(len(sed_pred)):
+                final_azi_pred = sed_pred[i] * azi_pred[i]
+                output = np.concatenate([sed_pred[i], final_azi_pred], axis=-1)
+                print(output.flatten())
+                
+            # Clear the buffer
+            audio_buffer = []
+except KeyboardInterrupt:
+    print("Streaming stopped by user")
+    
+    
+stream.stop_stream()
+stream.close()
+audio.terminate()
+
+
+
+"""Inference Tests with trained model"""
+# seld_metrics = SELDMetrics(model        = salsa_lite_model,
+#                            val_dataset  = testing_dataset,
+#                            epoch_count  = 1,
+#                            n_classes    = n_classes,
+#                            n_val_iter   = 1000)
+# # Tensorflow predictions + metrics
+# seld_error, error_rate, f_score, le_cd, lr_cd = seld_metrics.calc_csv_metrics() # Get the SELD metrics
+
+# TFLite Prediction + Metrics
+# tflite_prediction_data = []
+# for x_test, y_test in tqdm(testing_dataset, total = 1000):
+#     interpreter.set_tensor(input_details[0]['index'], x_test)
+#     interpreter.invoke()
+#     test_predictions = interpreter.get_tensor(output_details[0]['index'])
+    
+#     SED_pred = remove_batch_dim(np.array(test_predictions[:, :, :n_classes]))
+#     SED_gt   = remove_batch_dim(np.array(y_test[:, :, :n_classes]))
+#     SED_pred = (SED_pred > 0.3).astype(int)      
+    
+#     AZI_gt   = convert_xy_to_azimuth(remove_batch_dim(np.array(y_test[:, : , n_classes:])))
+#     AZI_pred = convert_xy_to_azimuth(remove_batch_dim(np.array(test_predictions[:, : , n_classes:])))
+
+#     for i in range(len(SED_pred)):
+#         masked_azimuths = SED_pred[i] * AZI_pred[i]
+#         output = np.concatenate([SED_pred[i], SED_gt[i], masked_azimuths, AZI_gt[i]], axis=-1)
+#         tflite_prediction_data.append(output.flatten())
+# df = pd.DataFrame(tflite_prediction_data)
+# dfcsv_filepath = "./csv_outputs/inference_test.csv"
+# df.to_csv(dfcsv_filepath, index=False, header=False)
+# seld_error, error_rate, f_score, le_cd, lr_cd = seld_metrics.calc_csv_metrics(filepath = dfcsv_filepath)
 
 
 """TFLite creating and predicting simulated data"""
@@ -239,51 +308,51 @@ seld_error, error_rate, f_score, le_cd, lr_cd = seld_metrics.calc_csv_metrics(fi
 
 
 """JW Testing the model processing speed here"""
-iterations = 1000
-print("Testing for {} times".format(iterations))
-tf_timings = [] # To calculate mean, variance
-feature_timings = [] 
-tflite_timings = []
-for i in range(iterations):
-    random_audio = np.random.rand(4, int(window_duration_s * fs)) # Keep the generated audio out of the timer
+# iterations = 1000
+# print("Testing for {} times".format(iterations))
+# tf_timings = [] # To calculate mean, variance
+# feature_timings = [] 
+# tflite_timings = []
+# for i in range(iterations):
+#     random_audio = np.random.rand(4, int(window_duration_s * fs)) # Keep the generated audio out of the timer
     
-    start_time = time.time()
+#     start_time = time.time()
     
-    scaled_random_audio = local_scaling(random_audio) # Scale the audio to fit [-1, 1]
-    features = extract_features(scaled_random_audio) # Feature shape of input_shape
-    features = np.expand_dims(features, axis=0) # Need to expand dims to form batch size = 1
+#     scaled_random_audio = local_scaling(random_audio) # Scale the audio to fit [-1, 1]
+#     features = extract_features(scaled_random_audio) # Feature shape of input_shape
+#     features = np.expand_dims(features, axis=0) # Need to expand dims to form batch size = 1
     
-    feat_time = time.time()
+#     feat_time = time.time()
     
-    # Going from batch, n_channels, width, height to 
-    # batch, height , width, n_channels
-    features = np.transpose(features, [0, 3, 2, 1])
+#     # Going from batch, n_channels, width, height to 
+#     # batch, height , width, n_channels
+#     features = np.transpose(features, [0, 3, 2, 1])
     
-    prediction_start = time.time()
-    predictions = salsa_lite_model.predict(features, verbose=0) # Get predictions of shape (1, 10 , 9) --> 10fps
-    prediction_end = time.time()
+#     prediction_start = time.time()
+#     predictions = salsa_lite_model.predict(features, verbose=0) # Get predictions of shape (1, 10 , 9) --> 10fps
+#     prediction_end = time.time()
     
-    tflite_start = time.time()
-    interpreter.set_tensor(input_details[0]['index'], features)
-    interpreter.invoke()
-    test_predictions = interpreter.get_tensor(output_details[0]['index'])
-    tflite_end = time.time()
+#     tflite_start = time.time()
+#     interpreter.set_tensor(input_details[0]['index'], features)
+#     interpreter.invoke()
+#     test_predictions = interpreter.get_tensor(output_details[0]['index'])
+#     tflite_end = time.time()
     
-    tensorflow_time_taken = prediction_end - prediction_start
-    tf_timings.append(tensorflow_time_taken)
-    extract_time = feat_time - start_time
-    feature_timings.append(extract_time)
-    tflite_time_taken = tflite_end - tflite_start
-    tflite_timings.append(tflite_time_taken)
+#     tensorflow_time_taken = prediction_end - prediction_start
+#     tf_timings.append(tensorflow_time_taken)
+#     extract_time = feat_time - start_time
+#     feature_timings.append(extract_time)
+#     tflite_time_taken = tflite_end - tflite_start
+#     tflite_timings.append(tflite_time_taken)
     
-# Process timings 
-print("Tensorflow inference mean time taken : {:.4f}s".format(np.mean(tf_timings)))
-print("Tensorflow inference variance time   : {:.4f}s".format(np.var(tf_timings)))
+# # Process timings 
+# print("Tensorflow inference mean time taken : {:.4f}s".format(np.mean(tf_timings)))
+# print("Tensorflow inference variance time   : {:.4f}s".format(np.var(tf_timings)))
 
-# Process timings 
-print("TFLite inference mean time taken : {:.4f}s".format(np.mean(tflite_timings)))
-print("TFLite inference variance time   : {:.4f}s".format(np.var(tflite_timings)))
+# # Process timings 
+# print("TFLite inference mean time taken : {:.4f}s".format(np.mean(tflite_timings)))
+# print("TFLite inference variance time   : {:.4f}s".format(np.var(tflite_timings)))
 
-# Process timings 
-print("Feature Extraction mean time : {:.4f}s".format(np.mean(feature_timings)))
-print("Feature Extraction variance  : {:.4f}s".format(np.var(feature_timings)))
+# # Process timings 
+# print("Feature Extraction mean time : {:.4f}s".format(np.mean(feature_timings)))
+# print("Feature Extraction variance  : {:.4f}s".format(np.var(feature_timings)))
