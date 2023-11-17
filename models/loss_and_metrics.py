@@ -42,7 +42,7 @@ def seld_loss(y_true, y_pred):
     # first n_classes --> SED output
     # remaining --> DOA output for [x * n_classes ... y * n_classes]
 
-    n_classes = 3 # hard-coded for the demo
+    n_classes = 4 # hard-coded for the demo
     sed_pred = y_pred[:, : , :n_classes]
     doa_pred = y_pred[:, : , n_classes:]
     
@@ -90,7 +90,7 @@ def doa_loss(y_true, y_pred):
     Returns:
         doa_loss : masked mean absolute error for the loss for DOA regression
     """
-    n_classes = 3
+    n_classes = 4
     doa_pred = y_pred[:, : , n_classes:]
     
     sed_gt   = y_true[:, : , :n_classes]
@@ -118,13 +118,13 @@ def masked_reg_loss_azimuth(event_frame_gt, doa_frame_gt, doa_frame_output, n_cl
     Returns:
         azi_loss    : (float) regression loss for the azimuth predictions
     """
-    
-    x_loss = compute_masked_reg_loss(input=doa_frame_output[:, :, : n_classes],
-                                     target=doa_frame_gt[:, :, : n_classes],
-                                     mask=event_frame_gt)
-    y_loss = compute_masked_reg_loss(input=doa_frame_output[:, :, n_classes:2*n_classes],
-                                     target=doa_frame_gt[:, :, n_classes:2*n_classes],
-                                     mask=event_frame_gt)
+    # Included n_classes-1 in all indexing as the last n_class will belong to noise, which has 0 azimuth by definition
+    x_loss = compute_masked_reg_loss(input=doa_frame_output[:, :, : n_classes-1],
+                                     target=doa_frame_gt[:, :, : n_classes-1],
+                                     mask=event_frame_gt[:, :, :n_classes-1])
+    y_loss = compute_masked_reg_loss(input=doa_frame_output[:, :, n_classes:2*n_classes-1],
+                                     target=doa_frame_gt[:, :, n_classes:2*n_classes-1],
+                                     mask=event_frame_gt[:, :, :n_classes-1])
     azi_loss = x_loss + y_loss
     
     return azi_loss
@@ -180,7 +180,7 @@ def remove_batch_dim(tens):
     return tens
 
 def convert_xy_to_azimuth(array, 
-                          n_classes=3):
+                          n_classes=4):
     """Converting an array of X,Y predictions into an array of azimuths.
     [x1, x2, ... , xn, y1, y2, ... , yn] into [azi1, azi2, ... , azin]
     
@@ -194,8 +194,6 @@ def convert_xy_to_azimuth(array,
         
     if not array.shape[-1] == 2*n_classes:
         print("Check  ", array.shape)
-        n_classes = array.shape[-1]//2
-        print("Manually setting n_classes to be half of last dim, ", n_classes)
     
     x_coords = array[: , :n_classes]
     y_coords = array[: , n_classes:]
@@ -223,7 +221,7 @@ class SELDMetrics(object):
                  val_dataset, 
                  epoch_count, 
                  doa_threshold = 20, 
-                 n_classes = 3,
+                 n_classes = 4,
                  sed_threshold = 0.5,
                  n_val_iter = 1000):
         

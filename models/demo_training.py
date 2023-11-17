@@ -37,7 +37,7 @@ tf.keras.backend.clear_session()
 # Global model settings, put into configs / .yml file eventually
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 resnet_style = 'bottleneck'
-n_classes = 3
+n_classes = 4
 batch_size = 32 # fixed because the GRU layer cannot recognise new batch sizes (not sure why)
 dataset_split = [0.6, 0.2, 0.2]
 total_epochs = 40 # For training

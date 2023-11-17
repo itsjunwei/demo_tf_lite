@@ -272,7 +272,8 @@ def load_file(filepath):
     # Converting to one-hot encoding
     class_labels = ['dog',
                     'impact',
-                    'speech']
+                    'speech',
+                    'noise']
 
     # Extract ground truth from the filename
     filename = filepath.split(os.sep)[-1] # filename  =  class_azimuth_idx.h5
@@ -280,6 +281,7 @@ def load_file(filepath):
     
     if gts[0] == "noise": # Everything is zero
         full_gt  = np.zeros(len(class_labels) * 3, dtype = np.float32)
+        full_gt[class_labels.index('noise')] = 1
         full_gt = np.reshape(full_gt, (1, len(full_gt)))
         frame_gt = np.concatenate([full_gt] * n_frames_out, axis = 0)
         return features , frame_gt
@@ -362,8 +364,8 @@ if __name__ == "__main__":
     
     # General Configs 
     # Window, Hop duration in seconds 
-    ws = 0.4
-    hs = 0.2
+    ws = 0.5
+    hs = 0.25
     seperate_audio = True
     create_features = True
     generate_dataset = True
