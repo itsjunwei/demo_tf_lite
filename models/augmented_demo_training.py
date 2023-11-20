@@ -17,7 +17,7 @@ import tensorflow as tf
 import inference_model as iml
 from keras.callbacks import ModelCheckpoint, EarlyStopping, LearningRateScheduler, CSVLogger, TensorBoard, Callback
 from datetime import datetime
-from augmentations import *
+from augmentations import freq_mask, random_bool
 
 
 now = datetime.now()
@@ -40,7 +40,7 @@ resnet_style = 'bottleneck'
 n_classes = 4
 batch_size = 32 # fixed because the GRU layer cannot recognise new batch sizes (not sure why)
 dataset_split = [0.6, 0.2, 0.2]
-total_epochs = 40 # For training
+total_epochs = 50 # For training
 
 
 """
@@ -64,11 +64,11 @@ aug_labels        = np.load(augmented_gt_fp, allow_pickle=True)
 
 combined_dataset = np.concatenate((feature_dataset, aug_dataset), axis=0)
 combined_labels  = np.concatenate((gt_labels, aug_labels), axis=0)
-dataset_size     = len(combined_dataset)
+dataset_size = len(combined_dataset)
 
 # Create dataset generator 
 def dataset_gen():
-    for d, l in zip(combined_dataset, gt_labels):
+    for d, l in zip(combined_dataset, combined_labels):
         yield (d,l)
 
 # Create the dataset class itself
@@ -82,6 +82,12 @@ dataset = tf.data.Dataset.from_generator(
     )
 )
 
+# Create another dataset to apply augmentations to
+# duplicated_dataset = dataset.shuffle().take(int(0.3 * dataset_size))
+# augmented_ds = duplicated_dataset.map(lambda x, y: (freq_mask(x, F=30, num_masks=1, replace_with_zero=True), y))
+# dataset = dataset.concatenate(augmented_ds)
+# dataset_size = int(len(combined_dataset) * 1.3)
+
 """# First, filter the dataset to keep only 70% of the images
 filtered_ds = ds.filter(lambda image, label: tf.py_function(func=random_bool, inp=[], Tout=tf.bool))
 
@@ -94,21 +100,24 @@ train_size = int(dataset_split[0] * dataset_size)
 val_size   = int(dataset_split[1] * dataset_size)
 test_size  = int(dataset_split[2] * dataset_size)
 
-# Shuffle the dataset before splitting
-shuffled_dataset = dataset.cache().shuffle(dataset_size,
-                                           seed = 2023)
+# Shuffle the augmentation
+shuffled_dataset = dataset.shuffle(dataset_size, reshuffle_each_iteration=True)
+# Apply the augmentation of x% of the data
+augmented_dataset = shuffled_dataset.take(int(dataset_size * 0.3))
+augmented_dataset = augmented_dataset.map(lambda x, y : (freq_mask(x), y))
+# Take the remaining non-augmented data
+non_augmented_dataset = dataset.skip(int(dataset_size * 0.3))
+# Combine them back together
+final_dataset = augmented_dataset.concatenate(non_augmented_dataset)
 
 # Create the training dataset, drop_remainder otherwise will throw error with irregular batch sizes
-train_dataset       = shuffled_dataset.take(train_size)
-
+train_dataset       = final_dataset.take(train_size)
 train_dataset       = train_dataset.batch(batch_size     = batch_size,
                                           drop_remainder = True)
 
-remaining_dataset   = shuffled_dataset.skip(train_size)
-
+remaining_dataset   = final_dataset.skip(train_size)
 validation_dataset  = remaining_dataset.take(val_size).batch(batch_size = batch_size, 
                                                              drop_remainder = True)
-
 test_dataset        = remaining_dataset.skip(val_size).batch(batch_size = batch_size, 
                                                              drop_remainder = True)
 
@@ -121,8 +130,8 @@ validation_dataset = validation_dataset.prefetch(tf.data.AUTOTUNE)
 test_dataset = test_dataset.prefetch(tf.data.AUTOTUNE)
 
 # Get input size of one input 
-total_samples = len(feature_dataset)
-input_shape = feature_dataset[0].shape
+total_samples = len(combined_dataset)
+input_shape = combined_dataset[0].shape
 print("Train size  : ", train_size)
 print("Val size    : ", val_size)
 print("Test size   : ", test_size)
@@ -137,7 +146,7 @@ salsa_lite_model = iml.get_inference_model(input_shape    = input_shape,
 """Removed batch_size param in the model to allow for TF to infer the batch size itself.
 Hopefully fixes the issue"""
 salsa_lite_model.reset_states() # attempt to fix the stateful BIGRU
-salsa_lite_model.summary()
+# salsa_lite_model.summary()
 
 # Model Training Configurations
 checkpoint = ModelCheckpoint("../experiments/salsalite_demo_{epoch:03d}_loss_{loss:.4f}.h5",

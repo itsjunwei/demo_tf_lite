@@ -332,7 +332,7 @@ def bigru_unit(x, add_dense=False):
     
     return bigru2
 
-def sed_fcn(x, n_classes=3):
+def sed_fcn(x, n_classes=4):
     """
     Fully connected layer for SED (multi-label, multi-class classification)
 
@@ -358,7 +358,7 @@ def sed_fcn(x, n_classes=3):
     # (batch_size, time_steps, n_classes)
     return x
 
-def doa_fcn(input, azi_only=False, n_classes=3):
+def doa_fcn(input, azi_only=False, n_classes=4):
     """
     Fully connected layer for DOA (regression)
 
@@ -408,7 +408,7 @@ def doa_fcn(input, azi_only=False, n_classes=3):
 
 def get_model(input_shape, 
               resnet_style='basic', 
-              n_classes=3, 
+              n_classes=4, 
               azi_only = False, 
               batch_size = None):
     """
@@ -474,7 +474,7 @@ def get_model(input_shape,
 
 if __name__ == "__main__":
     resnet_style = 'basic'
-    n_classes = 3
+    n_classes = 4
     input_shape = (95, 161, 7) # HWC format now
     # Get the salsa-lite model
     salsa_lite_model = get_model(input_shape    = input_shape, 

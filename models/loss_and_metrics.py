@@ -72,7 +72,7 @@ def sed_loss(y_true, y_pred):
     Returns:
         sed_loss : binary crossentropy loss for SED classification
     """
-    n_classes = 3
+    n_classes = 4
     sed_pred = y_pred[:, : , :n_classes]
     sed_gt   = y_true[:, : , :n_classes]
 

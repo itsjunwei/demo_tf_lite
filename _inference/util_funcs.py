@@ -39,7 +39,7 @@ def remove_batch_dim(tens):
     return tens
 
 def convert_xy_to_azimuth(array, 
-                          n_classes=3):
+                          n_classes=4):
     """Converting an array of X,Y predictions into an array of azimuths.
     [x1, x2, ... , xn, y1, y2, ... , yn] into [azi1, azi2, ... , azin]
     
@@ -81,7 +81,7 @@ class SELDMetrics(object):
                  val_dataset, 
                  epoch_count, 
                  doa_threshold = 20, 
-                 n_classes = 3,
+                 n_classes = 4,
                  sed_threshold = 0.5,
                  n_val_iter = 1000):
         

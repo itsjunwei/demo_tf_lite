@@ -37,7 +37,7 @@ tf.keras.backend.clear_session()
 # Global model settings, put into configs / .yml file eventually
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 resnet_style = 'bottleneck'
-n_classes = 3
+n_classes = 4
 fs = 48000
 trained_model_filepath = "./saved_models/bottleneck_w0.5s_scaled_with_noise.h5"
 
