@@ -366,12 +366,11 @@ if __name__ == "__main__":
     # Window, Hop duration in seconds 
     ws = 0.5
     hs = 0.25
-    seperate_audio = True
+    seperate_audio = False
     create_features = True
     generate_dataset = True
-    # dataset_dir = "./training_datasets/demo_dataset_{}s_{}s_NHWC/".format(ws,hs)
+
     dataset_dir = "./training_datasets/demo_dataset_{}s_{}s_wgn20/".format(ws,hs)
-    # concat_audio_dir = ".\data\Dataset_concatenated_tracks"
     concat_audio_dir = ".\data\scaled_audio"
     
     # Segment the audio first 
