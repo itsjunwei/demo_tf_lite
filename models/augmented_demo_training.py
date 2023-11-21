@@ -138,7 +138,7 @@ validation_dataset = validation_dataset.prefetch(tf.data.AUTOTUNE)
 test_dataset = test_dataset.prefetch(tf.data.AUTOTUNE)
 
 # Get input size of one input 
-input_shape = combined_dataset[0].shape
+input_shape = combined_dataset[0].shape # (n_mel, n_time, n_channels)
 print("Train size  : ", train_size)
 print("Val size    : ", val_size)
 print("Test size   : ", test_size)
