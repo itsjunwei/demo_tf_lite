@@ -17,7 +17,7 @@ import tensorflow as tf
 import inference_model as iml
 from keras.callbacks import ModelCheckpoint, EarlyStopping, LearningRateScheduler, CSVLogger, TensorBoard, Callback
 from datetime import datetime
-from augmentations import freq_mask, random_bool
+from augmentations import freq_mask, random_bool, random_shift_updown
 
 
 now = datetime.now()
@@ -97,37 +97,47 @@ filtered_ds = ds.filter(lambda image, label: tf.py_function(func=random_bool, in
 augmented_ds = filtered_ds.map(augment)
 ds = ds.concatenate(augmented_ds)"""
 
+"""
+Creating train/val/test split
 
-# Make a copy of the clean dataset first
-non_augmented_dataset = dataset.take(dataset_size)
-# Shuffle the dataset first (at each epoch)
-shuffled_dataset = dataset.shuffle(dataset_size, reshuffle_each_iteration=True)
-
-# Apply the augmentation of 50% of the data
-augmented_dataset = shuffled_dataset.take(int(dataset_size * 0.5))
-augmented_dataset = augmented_dataset.map(lambda x, y : (freq_mask(x), y))
-
-# Combine them back together
-final_dataset = augmented_dataset.concatenate(non_augmented_dataset)
-
-# Post augmentation
+Original dataset (100) -- Train (60) / Val (20) / Test (20)
+Train (60) x 2 --> Clean (60) / Freq_shift (30) / Mask (30)
+In total, we will have 0.6*2 + 0.2*2 = 1.6x the original dataset size
+"""
 # Get number of training, validation and test samples
-dataset_size = int(dataset_size * 1.5) # Update the size of the dataset
-train_size = int(dataset_split[0] * dataset_size)
-val_size   = int(dataset_split[1] * dataset_size)
-test_size  = int(dataset_split[2] * dataset_size)
+dataset_size = int(dataset_size)
+train_size   = int(dataset_split[0] * dataset_size)
+val_size     = int(dataset_split[1] * dataset_size)
+test_size    = int(dataset_split[2] * dataset_size)
 
-# Create the training dataset, drop_remainder otherwise will throw error with irregular batch sizes
-final_dataset = final_dataset.cache().shuffle(dataset_size, reshuffle_each_iteration=True) # Reshuffle the combined dataset
-train_dataset = final_dataset.take(train_size)
-train_dataset = train_dataset.batch(batch_size     = batch_size,
-                                    drop_remainder = True)
+# Now we begin the split
+shuffled_dataset = dataset.shuffle(dataset_size) # Shuffle first
+non_training_dataset = dataset.skip(train_size) # Validation and Testing splits, non-augmented
+validation_dataset = non_training_dataset.take(val_size).batch(batch_size = batch_size,
+                                                               drop_remainder = True)
+test_dataset       = non_training_dataset.skip(val_size).batch(batch_size = batch_size,
+                                                               drop_remainder = True)
 
-remaining_dataset  = final_dataset.skip(train_size)
-validation_dataset = remaining_dataset.take(val_size).batch(batch_size = batch_size, 
-                                                            drop_remainder = True)
-test_dataset       = remaining_dataset.skip(val_size).batch(batch_size = batch_size, 
-                                                            drop_remainder = True)
+# Take the remaining data for training
+training_dataset = dataset.take(train_size)
+# Shuffle again, every epoch so different sets of data get augmented
+training_dataset = training_dataset.shuffle(train_size, reshuffle_each_iteration=True)
+non_augmented_dataset = training_dataset.take(train_size) # Clean training data
+
+augment_size = int(train_size/2) # Half of the data goes to each augmentation
+train_size = int(train_size * 2) # Final training size
+# Frequency shifting
+freq_shift_dataset = training_dataset.take(augment_size)
+freq_shift_dataset = freq_shift_dataset.map(lambda x, y : (random_shift_updown(x), y))
+# Freq masking
+mask_out_dataset = training_dataset.skip(augment_size)
+mask_out_dataset = mask_out_dataset.map(lambda x, y : (freq_mask(x), y))
+# Combine them together again
+train_dataset = non_augmented_dataset.concatenate(freq_shift_dataset)
+train_dataset = train_dataset.concatenate(mask_out_dataset)
+# Shuffle after concatenating and batch them
+train_dataset = train_dataset.shuffle(train_size, reshuffle_each_iteration = True).batch(batch_size = batch_size,
+                                                                                               drop_remainder = True)
 
 
 """Most dataset input pipelines should end with a call to prefetch. This 
@@ -156,15 +166,6 @@ salsa_lite_model.reset_states() # attempt to fix the stateful BIGRU
 # salsa_lite_model.summary()
 
 # Model Training Configurations
-checkpoint = ModelCheckpoint("../experiments/salsalite_demo_{epoch:03d}_loss_{loss:.4f}.h5",
-                             monitor="val_loss",
-                             verbose=2,
-                             save_weights_only=False,
-                             save_best_only=True)
-
-early = EarlyStopping(monitor="val_loss",
-                      mode="min",
-                      patience=10)
 class LR_schedule:
     def __init__(self, total_epochs):
         self.total_epochs = total_epochs
@@ -195,7 +196,6 @@ csv_logger = CSVLogger(filename = '../experiments/{}/training_demo.csv'.format(n
 tensorboard_callback = TensorBoard(log_dir='../experiments/{}/logs'.format(now), 
                                    histogram_freq=1)
 
-# callbacks_list = [checkpoint, early, tensorboard_callback, csv_logger, schedule]
 callbacks_list = [tensorboard_callback, csv_logger, schedule] # Removed unneeded callbacks
 
 # Checking if GPU is being used
