@@ -39,7 +39,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 resnet_style = 'bottleneck'
 n_classes = 4
 fs = 48000
-trained_model_filepath = "./saved_models/bottleneck_w0.5s_scaled_with_noise.h5"
+trained_model_filepath = "./saved_models/model_wgn20_freqmask50.h5"
 
 """
 Dataset loading functions
@@ -110,56 +110,93 @@ salsa_lite_model.load_weights(trained_model_filepath)
 
 
 """Load the tflite model"""
-with open('./saved_models/tflite_model.tflite', 'rb') as fid:
-    tflite_model = fid.read()
+# with open('./saved_models/tflite_model.tflite', 'rb') as fid:
+#     tflite_model = fid.read()
 
-interpreter = tf.lite.Interpreter(model_content=tflite_model)
-interpreter.allocate_tensors()
+# interpreter = tf.lite.Interpreter(model_content=tflite_model)
+# interpreter.allocate_tensors()
 
-# Get input and output tensors.
-input_details = interpreter.get_input_details()
-output_details = interpreter.get_output_details()
+# # Get input and output tensors.
+# input_details = interpreter.get_input_details()
+# output_details = interpreter.get_output_details()
+
+"""Tensorflow predicting re-re-recorded audio data"""
+# new_recorded_audio_dir = os.path.join('_test_audio', 'ambisonics_combined')
+# for new_audio in os.listdir(new_recorded_audio_dir):
+#     if new_audio.endswith('.wav'):
+#         print(new_audio)
+#         audio_fp = os.path.join(new_recorded_audio_dir, new_audio)
+
+#         audio_data, _ = librosa.load(audio_fp, sr=fs, mono=False, dtype=np.float32)
+#         frames = librosa.util.frame(audio_data, 
+#                                     frame_length=int(window_duration_s * fs), 
+#                                     hop_length=int(window_duration_s * fs))
+#         frames = frames.T
+
+#         tf_data = []
+#         for frame in frames:
+#             four_channel = frame.T
+#             feature = extract_features(four_channel)
+#             feature_filename = new_audio.replace('.wav', '.npy')
+#             np.save(os.path.join('./_features_display', feature_filename), feature, allow_pickle=True)
+#             feature = np.expand_dims(feature, axis = 0)
+#             feature = np.transpose(feature, [0, 3, 2, 1])
+
+#             output_data = salsa_lite_model.predict(feature,
+#                                                    verbose=0)
+            
+#             sed_pred = remove_batch_dim(np.array(output_data[:, :, :n_classes]))
+#             sed_pred = (sed_pred > 0.7).astype(int)  
+#             azi_pred = convert_xy_to_azimuth(remove_batch_dim(np.array(output_data[:, : , n_classes:])))
+#             for i in range(len(sed_pred)):
+#                 final_azi_pred = sed_pred[i] * azi_pred[i]
+#                 output = np.concatenate([sed_pred[i], final_azi_pred], axis=-1)
+#                 tf_data.append(output.flatten())
+
+#         df = pd.DataFrame(tf_data)
+#         os.makedirs("./csv_outputs", exist_ok=True)
+#         df.to_csv("./csv_outputs/test_{}".format(new_audio.replace('.wav', '.csv')), index=False, header=False)
+
 
 
 """TFLite predicting and displaying SALSA-Lite features for all files in folder"""
-new_recorded_audio_dir = os.path.join('_test_audio', 'ambisonics_combined')
-for new_audio in os.listdir(new_recorded_audio_dir):
-    if new_audio.endswith('.wav'):
-        print(new_audio)
-        audio_fp = os.path.join(new_recorded_audio_dir, new_audio)
+# new_recorded_audio_dir = os.path.join('_test_audio', 'ambisonics_combined')
+# for new_audio in os.listdir(new_recorded_audio_dir):
+#     if new_audio.endswith('.wav'):
+#         print(new_audio)
+#         audio_fp = os.path.join(new_recorded_audio_dir, new_audio)
 
-        audio_data, _ = librosa.load(audio_fp, sr=fs, mono=False, dtype=np.float32)
-        frames = librosa.util.frame(audio_data, 
-                                    frame_length=int(window_duration_s * fs), 
-                                    hop_length=int(window_duration_s * fs))
-        frames = frames.T
+#         audio_data, _ = librosa.load(audio_fp, sr=fs, mono=False, dtype=np.float32)
+#         frames = librosa.util.frame(audio_data, 
+#                                     frame_length=int(window_duration_s * fs), 
+#                                     hop_length=int(window_duration_s * fs))
+#         frames = frames.T
 
-        tflite_data = []
-        for frame in frames:
-            four_channel = frame.T
-            feature = extract_features(four_channel)
-            feature_filename = new_audio.replace('.wav', '.npy')
-            np.save(os.path.join('./_features_display', feature_filename), feature, allow_pickle=True)
-            feature = np.expand_dims(feature, axis = 0)
-            feature = np.transpose(feature, [0, 3, 2, 1])
+#         tflite_data = []
+#         for frame in frames:
+#             four_channel = frame.T
+#             feature = extract_features(four_channel)
+#             feature_filename = new_audio.replace('.wav', '.npy')
+#             np.save(os.path.join('./_features_display', feature_filename), feature, allow_pickle=True)
+#             feature = np.expand_dims(feature, axis = 0)
+#             feature = np.transpose(feature, [0, 3, 2, 1])
 
-            # TFLite prediction
-            interpreter.set_tensor(input_details[0]['index'], feature)
-            interpreter.invoke()
-            output_data = interpreter.get_tensor(output_details[0]['index'])
+#             # TFLite prediction
+#             interpreter.set_tensor(input_details[0]['index'], feature)
+#             interpreter.invoke()
+#             output_data = interpreter.get_tensor(output_details[0]['index'])
             
-            sed_pred = remove_batch_dim(np.array(output_data[:, :, :n_classes]))
-            sed_pred = (sed_pred > 0.7).astype(int)  
-            azi_pred = convert_xy_to_azimuth(remove_batch_dim(np.array(output_data[:, : , n_classes:])))
-            for i in range(len(sed_pred)):
-                final_azi_pred = sed_pred[i] * azi_pred[i]
-                output = np.concatenate([sed_pred[i], final_azi_pred], axis=-1)
-                tflite_data.append(output.flatten())
+#             sed_pred = remove_batch_dim(np.array(output_data[:, :, :n_classes]))
+#             sed_pred = (sed_pred > 0.7).astype(int)  
+#             azi_pred = convert_xy_to_azimuth(remove_batch_dim(np.array(output_data[:, : , n_classes:])))
+#             for i in range(len(sed_pred)):
+#                 final_azi_pred = sed_pred[i] * azi_pred[i]
+#                 output = np.concatenate([sed_pred[i], final_azi_pred], axis=-1)
+#                 tflite_data.append(output.flatten())
 
-        df = pd.DataFrame(tflite_data)
-        os.makedirs("./csv_outputs", exist_ok=True)
-        df.to_csv("./csv_outputs/test_{}".format(new_audio.replace('.wav', '.csv')), index=False, header=False)
-
+#         df = pd.DataFrame(tflite_data)
+#         os.makedirs("./csv_outputs", exist_ok=True)
+#         df.to_csv("./csv_outputs/test_{}".format(new_audio.replace('.wav', '.csv')), index=False, header=False)
 
 
 """Inference Tests with trained model"""
@@ -212,26 +249,29 @@ for new_audio in os.listdir(new_recorded_audio_dir):
 #     feature = np.expand_dims(feature, axis = 0)
 #     feature = np.transpose(feature, [0, 3, 2, 1])
 
-#     interpreter.set_tensor(input_details[0]['index'], feature)
-#     interpreter.invoke()
-#     output_data = interpreter.get_tensor(output_details[0]['index'])
-#     sed_pred = remove_batch_dim(np.array(output_data[:, :, :n_classes]))
-#     sed_pred = (sed_pred > 0.7).astype(int)  
-#     azi_pred = convert_xy_to_azimuth(remove_batch_dim(np.array(output_data[:, : , n_classes:])))
-#     for i in range(len(sed_pred)):
-#         final_azi_pred = sed_pred[i] * azi_pred[i]
-#         output = np.concatenate([sed_pred[i], final_azi_pred], axis=-1)
-#         tflite_data.append(output.flatten())
+    # interpreter.set_tensor(input_details[0]['index'], feature)
+    # interpreter.invoke()
+    # output_data = interpreter.get_tensor(output_details[0]['index'])
+    # sed_pred = remove_batch_dim(np.array(output_data[:, :, :n_classes]))
+    # sed_pred = (sed_pred > 0.7).astype(int)  
+    # azi_pred = convert_xy_to_azimuth(remove_batch_dim(np.array(output_data[:, : , n_classes:])))
+    # for i in range(len(sed_pred)):
+    #     final_azi_pred = sed_pred[i] * azi_pred[i]
+    #     output = np.concatenate([sed_pred[i], final_azi_pred], axis=-1)
+    #     tflite_data.append(output.flatten())
     
 
-#     predictions = salsa_lite_model.predict(feature, verbose=0)
-#     sed_pred = remove_batch_dim(np.array(predictions[:, :, :n_classes]))
-#     sed_pred = (sed_pred > 0.7).astype(int)  
-#     azi_pred = convert_xy_to_azimuth(remove_batch_dim(np.array(predictions[:, : , n_classes:])))
-#     for i in range(len(sed_pred)):
-#         final_azi_pred = sed_pred[i] * azi_pred[i]
-#         output = np.concatenate([sed_pred[i], final_azi_pred], axis=-1)
-#         pred_data.append(output.flatten())
+    # predictions = salsa_lite_model.predict(feature, verbose=0)
+    # sed_pred = remove_batch_dim(np.array(predictions[:, :, :n_classes]))
+    # sed_pred = (sed_pred > 0.7).astype(int)  
+    # azi_pred = convert_xy_to_azimuth(remove_batch_dim(np.array(predictions[:, : , n_classes:])))
+    # for i in range(len(sed_pred)):
+    #     final_azi_pred = sed_pred[i] * azi_pred[i]
+    #     if int(sed_pred[i][-1]) == 1:
+    #         final_azi_pred[-1] = 0
+    #     output = np.concatenate([sed_pred[i], final_azi_pred], axis=-1)
+    #     print(output)
+    #     pred_data.append(output.flatten())
 
 # df = pd.DataFrame(pred_data)
 # df.to_csv('./csv_outputs/test_{}.csv'.format(now), index=False, header=False)

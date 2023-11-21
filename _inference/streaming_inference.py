@@ -33,7 +33,7 @@ tf.keras.backend.clear_session()
 # Global model settings, put into configs / .yml file eventually
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 resnet_style = 'bottleneck'
-n_classes = 3
+n_classes = 4
 active_classes = ['dog' , 'impact' , 'speech']
 fs = 48000
 trained_model_filepath = "./saved_models/bottleneck_w0.5s_scaled_with_noise.h5"
@@ -118,6 +118,8 @@ try:
             # frame_outputs = []
             for i in range(len(sed_pred)):
                 final_azi_pred = sed_pred[i] * azi_pred[i]
+                if int(sed_pred[i][-1]) == 1:
+                    final_azi_pred[-1] = 0
                 output = np.concatenate([sed_pred[i], final_azi_pred], axis=-1)
                 print(output)
                 # frame_outputs.append(output.flatten())
