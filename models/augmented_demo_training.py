@@ -111,15 +111,15 @@ val_size     = int(dataset_split[1] * dataset_size)
 test_size    = int(dataset_split[2] * dataset_size)
 
 # Now we begin the split
-shuffled_dataset = dataset.shuffle(dataset_size) # Shuffle first
-non_training_dataset = dataset.skip(train_size) # Validation and Testing splits, non-augmented
+shuffled_dataset = dataset.cache().shuffle(dataset_size) # Shuffle first
+non_training_dataset = shuffled_dataset.skip(train_size) # Validation and Testing splits, non-augmented
 validation_dataset = non_training_dataset.take(val_size).batch(batch_size = batch_size,
                                                                drop_remainder = True)
 test_dataset       = non_training_dataset.skip(val_size).batch(batch_size = batch_size,
                                                                drop_remainder = True)
 
 # Take the remaining data for training
-training_dataset = dataset.take(train_size)
+training_dataset = shuffled_dataset.take(train_size)
 # Shuffle again, every epoch so different sets of data get augmented
 training_dataset = training_dataset.shuffle(train_size, reshuffle_each_iteration=True)
 non_augmented_dataset = training_dataset.take(train_size) # Clean training data
@@ -136,8 +136,8 @@ mask_out_dataset = mask_out_dataset.map(lambda x, y : (freq_mask(x), y))
 train_dataset = non_augmented_dataset.concatenate(freq_shift_dataset)
 train_dataset = train_dataset.concatenate(mask_out_dataset)
 # Shuffle after concatenating and batch them
-train_dataset = train_dataset.shuffle(train_size, reshuffle_each_iteration = True).batch(batch_size = batch_size,
-                                                                                               drop_remainder = True)
+train_dataset = train_dataset.shuffle(train_size).batch(batch_size = batch_size,
+                                                        drop_remainder = True)
 
 
 """Most dataset input pipelines should end with a call to prefetch. This 

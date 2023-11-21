@@ -91,11 +91,6 @@ if __name__ == "__main__":
 
     # Tile the values to fill the time and channel dimensions
     spectrogram = tf.tile(mel_values, [1, n_time, n_channels])  # shape becomes (n_mel, n_time, n_channels)
-    # rt = tf.random.uniform(shape=[95, 81, 7])
-    # print(rt)
-    # print(freq_mask(rt))
-    # print(random_shift_updown(rt))
     
     display_spectrogram(spectrogram)
-    display_spectrogram(freq_mask(rt))
     display_spectrogram(random_shift_updown(spectrogram))
