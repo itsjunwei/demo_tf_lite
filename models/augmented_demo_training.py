@@ -55,6 +55,7 @@ print("Labels taken from   : {}, size : {:.2f} MB".format(gt_label_fp, os.path.g
 feature_dataset  = np.load(feature_data_fp, allow_pickle=True)
 gt_labels        = np.load(gt_label_fp, allow_pickle=True)
 
+# Load augmented dataset
 augmented_data_fp = os.path.join(demo_dataset_dir, 'augmented_salsalite_features.npy')
 augmented_gt_fp   = os.path.join(demo_dataset_dir, 'augmented_salsalite_labels.npy')
 print("Augmented features taken from : {}, size : {:.2f} MB".format(augmented_data_fp, os.path.getsize(augmented_data_fp)/(1024*1024)))
@@ -62,6 +63,7 @@ print("Augmented labels taken from   : {}, size : {:.2f} MB".format(augmented_gt
 aug_dataset       = np.load(augmented_data_fp, allow_pickle=True)
 aug_labels        = np.load(augmented_gt_fp, allow_pickle=True)
 
+# Combine them
 combined_dataset = np.concatenate((feature_dataset, aug_dataset), axis=0)
 combined_labels  = np.concatenate((gt_labels, aug_labels), axis=0)
 dataset_size = len(combined_dataset)
@@ -95,31 +97,37 @@ filtered_ds = ds.filter(lambda image, label: tf.py_function(func=random_bool, in
 augmented_ds = filtered_ds.map(augment)
 ds = ds.concatenate(augmented_ds)"""
 
+
+# Make a copy of the clean dataset first
+non_augmented_dataset = dataset.take(dataset_size)
+# Shuffle the dataset first (at each epoch)
+shuffled_dataset = dataset.shuffle(dataset_size, reshuffle_each_iteration=True)
+
+# Apply the augmentation of 50% of the data
+augmented_dataset = shuffled_dataset.take(int(dataset_size * 0.5))
+augmented_dataset = augmented_dataset.map(lambda x, y : (freq_mask(x), y))
+
+# Combine them back together
+final_dataset = augmented_dataset.concatenate(non_augmented_dataset)
+
+# Post augmentation
 # Get number of training, validation and test samples
+dataset_size = int(dataset_size * 1.5) # Update the size of the dataset
 train_size = int(dataset_split[0] * dataset_size)
 val_size   = int(dataset_split[1] * dataset_size)
 test_size  = int(dataset_split[2] * dataset_size)
 
-# Shuffle the augmentation
-shuffled_dataset = dataset.shuffle(dataset_size, reshuffle_each_iteration=True)
-# Apply the augmentation of x% of the data
-augmented_dataset = shuffled_dataset.take(int(dataset_size * 0.3))
-augmented_dataset = augmented_dataset.map(lambda x, y : (freq_mask(x), y))
-# Take the remaining non-augmented data
-non_augmented_dataset = dataset.skip(int(dataset_size * 0.3))
-# Combine them back together
-final_dataset = augmented_dataset.concatenate(non_augmented_dataset)
-
 # Create the training dataset, drop_remainder otherwise will throw error with irregular batch sizes
-train_dataset       = final_dataset.take(train_size)
-train_dataset       = train_dataset.batch(batch_size     = batch_size,
-                                          drop_remainder = True)
+final_dataset = final_dataset.cache().shuffle(dataset_size, reshuffle_each_iteration=True) # Reshuffle the combined dataset
+train_dataset = final_dataset.take(train_size)
+train_dataset = train_dataset.batch(batch_size     = batch_size,
+                                    drop_remainder = True)
 
-remaining_dataset   = final_dataset.skip(train_size)
-validation_dataset  = remaining_dataset.take(val_size).batch(batch_size = batch_size, 
-                                                             drop_remainder = True)
-test_dataset        = remaining_dataset.skip(val_size).batch(batch_size = batch_size, 
-                                                             drop_remainder = True)
+remaining_dataset  = final_dataset.skip(train_size)
+validation_dataset = remaining_dataset.take(val_size).batch(batch_size = batch_size, 
+                                                            drop_remainder = True)
+test_dataset       = remaining_dataset.skip(val_size).batch(batch_size = batch_size, 
+                                                            drop_remainder = True)
 
 
 """Most dataset input pipelines should end with a call to prefetch. This 
@@ -130,7 +138,6 @@ validation_dataset = validation_dataset.prefetch(tf.data.AUTOTUNE)
 test_dataset = test_dataset.prefetch(tf.data.AUTOTUNE)
 
 # Get input size of one input 
-total_samples = len(combined_dataset)
 input_shape = combined_dataset[0].shape
 print("Train size  : ", train_size)
 print("Val size    : ", val_size)
@@ -139,10 +146,10 @@ print("Batch size  : ", batch_size)
 print("Input shape : ", input_shape)
 
 # Get the salsa-lite model
-salsa_lite_model = iml.get_inference_model(input_shape    = input_shape,
-                                 resnet_style   = resnet_style,
-                                 n_classes      = n_classes,
-                                 azi_only       = True)
+salsa_lite_model = iml.get_inference_model(input_shape  = input_shape,
+                                           resnet_style = resnet_style,
+                                           n_classes    = n_classes,
+                                           azi_only     = True)
 """Removed batch_size param in the model to allow for TF to infer the batch size itself.
 Hopefully fixes the issue"""
 salsa_lite_model.reset_states() # attempt to fix the stateful BIGRU
@@ -218,7 +225,7 @@ for epoch_count in range(total_epochs):
                                            initial_epoch    = epoch_count,
                                            validation_data  = validation_dataset,
                                            callbacks        = callbacks_list,
-                                           verbose          = 2)
+                                           verbose          = 1)
     
     seld_metrics = SELDMetrics(model        = salsa_lite_model,
                                val_dataset  = validation_dataset,
@@ -235,6 +242,9 @@ for epoch_count in range(total_epochs):
         best_performing_epoch_path = "../experiments/{}/seld_model/epoch_{}_seld_{:.3f}.h5".format(now, min_SELD_error_array[0], min_SELD_error_array[1])
         print("Best performing epoch : {}, SELD Error : {:.4f}\n".format(min_SELD_error_array[0], min_SELD_error_array[1]))
         salsa_lite_model.save_weights(best_performing_epoch_path, overwrite=True)
+    if ((epoch_count - min_SELD_error_array[0]) == 10): 
+        print("SELD Error not decreasing any further for 10 epochs. Stopping training now")
+        break # Early stopping criterion
 
 # Present the SELD metrics for the best performing model
 min_SELD_error_array = min(train_stats, key = lambda x : x[1])

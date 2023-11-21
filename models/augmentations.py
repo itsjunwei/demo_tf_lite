@@ -2,7 +2,21 @@ import tensorflow as tf
 import random
 
 
-def freq_mask(spec, F=30, num_masks=1, replace_with_zero=True):
+def freq_mask(spec, F=2, num_masks=1, replace_with_zero=True):
+    """
+    Apply a frequency mask to the spectrogram. Starting point of the mask is f0, while the max. width
+    of the mask is defined by F. Seeing as how the log-power spectrogram is (1,41) bins and the NIPD
+    spectrograms are (1,21), setting F=2 will allow for maximum 5%/10% of spectrogram to be masked for 
+    the log-power/NIPD spectrograms respectively.
+    
+    The masks will replace the original values with zero. If `replace_with_zero` is False, the mask will
+    replace the original values with the mean of the spectrogram values instead. 
+    
+    Usage:
+        Just pass the function to the dataset via a .map() function
+        For example, 
+            augmented_dataset = dataset.map(lambda x, y : (freq_mask(x), y))
+    """
     cloned = tf.identity(spec)
     num_mel_channels = cloned.shape[0]
     
