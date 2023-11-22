@@ -39,7 +39,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 resnet_style = 'bottleneck'
 n_classes = 4
 batch_size = 32 # fixed because the GRU layer cannot recognise new batch sizes (not sure why)
-dataset_split = [0.6, 0.2, 0.2]
+dataset_split = [0.5, 0.25, 0.25]
 total_epochs = 50 # For training
 
 
@@ -63,9 +63,18 @@ print("Augmented labels taken from   : {}, size : {:.2f} MB".format(augmented_gt
 aug_dataset       = np.load(augmented_data_fp, allow_pickle=True)
 aug_labels        = np.load(augmented_gt_fp, allow_pickle=True)
 
+# Load original recorded dataset
+clean_dataset_dir = "../dataset/training_datasets/demo_dataset_0.5s_0.25s_NHWC_scaled"
+clean_feature_fp  = os.path.join(clean_dataset_dir, 'demo_salsalite_features.npy')
+clean_gt_fp       = os.path.join(clean_dataset_dir, 'demo_gt_labels.npy')
+print("No WGN features taken from : {}, size : {:.2f} MB".format(clean_feature_fp, os.path.getsize(clean_feature_fp)/(1024*1024)))
+print("No WGN labels taken from   : {}, size : {:.2f} MB".format(clean_gt_fp, os.path.getsize(clean_gt_fp)/(1024*1024)))
+clean_dataset = np.load(clean_feature_fp, allow_pickle=True)
+clean_labels  = np.load(clean_gt_fp, allow_pickle=True)
+
 # Combine them
-combined_dataset = np.concatenate((feature_dataset, aug_dataset), axis=0)
-combined_labels  = np.concatenate((gt_labels, aug_labels), axis=0)
+combined_dataset = np.concatenate((feature_dataset, aug_dataset, clean_dataset), axis=0)
+combined_labels  = np.concatenate((gt_labels, aug_labels, clean_labels), axis=0)
 dataset_size = len(combined_dataset)
 
 # Create dataset generator 
@@ -169,6 +178,10 @@ salsa_lite_model.reset_states() # attempt to fix the stateful BIGRU
 class LR_schedule:
     def __init__(self, total_epochs):
         self.total_epochs = total_epochs
+        # self.initial_lr = 3e-4
+        # self.ending_lr = 1e-4
+        self.initial_lr = 2e-4
+        self.ending_lr = 5e-5
     
     def scheduler(self, epoch, lr):
         """Learning rate schedule should be 3x10^-4 for the first 70% of epochs, and it should reduce to 
@@ -179,12 +192,12 @@ class LR_schedule:
         updates to the weights become smaller."""
         
         if epoch < int(0.7 * self.total_epochs):
-            lr = 3e-4
+            lr = self.initial_lr
             return lr
         else:
-            decay_per_epoch = (3e-4 - 1e-4) / (0.3 * self.total_epochs)
+            decay_per_epoch = (self.initial_lr - self.ending_lr) / (0.3 * self.total_epochs)
             lr_decay = (epoch - int(0.7 * self.total_epochs)) * decay_per_epoch
-            lr = 3e-4 - lr_decay
+            lr = self.initial_lr - lr_decay
             return lr
 
 training_lr = LR_schedule(total_epochs = total_epochs)

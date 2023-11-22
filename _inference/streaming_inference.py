@@ -53,7 +53,7 @@ salsa_lite_model = get_model(input_shape    = input_shape,
                              batch_size     = 1)
 
 """Load the tflite model"""
-with open('./saved_models/tflite_model.tflite', 'rb') as fid:
+with open('./tflite_models/wgn20_freqmask_3_randshift/tflite_model.tflite', 'rb') as fid:
     tflite_model = fid.read()
 
 interpreter = tf.lite.Interpreter(model_content=tflite_model)

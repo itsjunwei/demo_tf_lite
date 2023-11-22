@@ -205,8 +205,8 @@ def segment_concat_audio(concat_data_dir = "./data/Dataset_concatenated_tracks/"
         output_data_dir = './_audio/cleaned_data_{}s_{}s/{}'.format(window_duration, hop_duration, ct.lower())
         higher_level_dir = './_audio/cleaned_data_{}s_{}s/'.format(window_duration, hop_duration)
         if add_wgn: 
-            higher_level_dir = higher_level_dir.replace("cleaned_data" , "add_wgn")
-            output_data_dir = output_data_dir.replace('cleaned_data' , 'add_wgn')
+            higher_level_dir = higher_level_dir.replace("cleaned_data" , "add_random_wgn")
+            output_data_dir = output_data_dir.replace('cleaned_data' , 'add_random_wgn')
         # create dirs
         os.makedirs(output_data_dir, exist_ok=True)
         print("Storing {} audio in :  {}".format(ct, output_data_dir))
@@ -223,16 +223,16 @@ def segment_concat_audio(concat_data_dir = "./data/Dataset_concatenated_tracks/"
                 # load audio
                 audio , _ = librosa.load(fullfn, sr=fs, mono=False, dtype=np.float32)
                 
-                if add_wgn:
-                    signal_power = np.mean(np.abs(audio) ** 2)
-                    if snr_db is None:
-                        snr_db = 20
-                    desired_SNR_dB = snr_db
-                    # Calculate the standard deviation of the noise
-                    noise_std_dev = np.sqrt(signal_power / (10 ** (desired_SNR_dB / 10)))
-                    # Generate the noise
-                    noise = np.random.normal(0, noise_std_dev, size=audio.shape)
-                    audio += noise
+                # if add_wgn:
+                #     signal_power = np.mean(np.abs(audio) ** 2)
+                #     if snr_db is None:
+                #         snr_db = 20
+                #     desired_SNR_dB = snr_db
+                #     # Calculate the standard deviation of the noise
+                #     noise_std_dev = np.sqrt(signal_power / (10 ** (desired_SNR_dB / 10)))
+                #     # Generate the noise
+                #     noise = np.random.normal(0, noise_std_dev, size=audio.shape)
+                #     audio += noise
                 
                 # Segment the audio input into overlapping frames
                 frames = librosa.util.frame(audio, frame_length=frame_len, hop_length=hop_len)
@@ -240,6 +240,12 @@ def segment_concat_audio(concat_data_dir = "./data/Dataset_concatenated_tracks/"
                 # Transpose into (n_segments, timebins, channels)
                 frames = frames.T
                 for idx, frame in enumerate(tqdm(frames)):
+                    if add_wgn: # Add a variable amount of noise to each frame
+                        signal_power = np.mean(np.abs(frame) ** 2)
+                        desired_SNR_dB = np.random.randint(5,25) # SNR_DB = [5, 25]
+                        noise_std_dev = np.sqrt(signal_power / (10 ** (desired_SNR_dB / 10)))
+                        noise = np.random.normal(0, noise_std_dev, size=frame.shape)
+                        frame += noise
                     final_fn = "{}_{}_{}.wav".format(ct.lower(), azimuth, idx+1)
                     final_fp = os.path.join(output_data_dir, final_fn)
                     sf.write(final_fp, frame, samplerate=fs)
@@ -366,11 +372,11 @@ if __name__ == "__main__":
     # Window, Hop duration in seconds 
     ws = 0.5
     hs = 0.25
-    seperate_audio = False
+    seperate_audio = True
     create_features = True
     generate_dataset = True
 
-    dataset_dir = "./training_datasets/demo_dataset_{}s_{}s_wgn20/".format(ws,hs)
+    dataset_dir = "./training_datasets/demo_dataset_{}s_{}s_wgn_random/".format(ws,hs)
     concat_audio_dir = ".\data\scaled_audio"
     
     # Segment the audio first 
