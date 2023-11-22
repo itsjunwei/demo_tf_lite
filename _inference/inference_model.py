@@ -125,7 +125,6 @@ def micro_resnet_block(x, out_channels, stride):
 
     # Stride = 2 actually does an average pooling on x
     if stride == 2:
-
         x = AveragePooling2D()(x)
 
         identity = AveragePooling2D()(identity)
@@ -353,7 +352,7 @@ def sed_fcn(x, n_classes=4):
     x = ReLU(name = 'sed_relu')(x)
     x = Dropout(0.2)(x)
     x = Dense(n_classes, name='event_frame_logits')(x)
-    x = Activation('sigmoid', name='event_pred')(x)
+    x = Activation('sigmoid', name='sed_sigmoid_out')(x)
 
     # (batch_size, time_steps, n_classes)
     return x

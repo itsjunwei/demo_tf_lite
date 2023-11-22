@@ -51,6 +51,11 @@ def freq_mask(spec, F=3, num_masks=1, replace_with_zero=True):
     return cloned
 
 def random_shift_updown(spec):
+    """
+    Randomly shift a set of frequency bins up or down. Hard set the maximum frequency range to be 8% 
+    of total frequency bins. After shifting the frequency bins up/down, they will be reflected to fill
+    the empty space created by the moving bins. 
+    """
     
     n_mel, n_time, n_channels = spec.shape
     freq_shift_range = int(n_mel * 0.08)
