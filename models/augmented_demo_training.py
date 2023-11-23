@@ -235,17 +235,17 @@ os.makedirs('../experiments/{}/seld_model/'.format(now), exist_ok=True)
 for epoch_count in range(total_epochs):
     
     demo_model_hist = salsa_lite_model.fit(train_dataset,
-                                           epochs           = epoch_count+1,
-                                           initial_epoch    = epoch_count,
-                                           validation_data  = validation_dataset,
-                                           callbacks        = callbacks_list,
-                                           verbose          = 1)
+                                           epochs          = epoch_count+1,
+                                           initial_epoch   = epoch_count,
+                                           validation_data = validation_dataset,
+                                           callbacks       = callbacks_list,
+                                           verbose         = 1)
     
-    seld_metrics = SELDMetrics(model        = salsa_lite_model,
-                               val_dataset  = validation_dataset,
-                               epoch_count  = epoch_count,
-                               n_classes    = n_classes,
-                               n_val_iter   = int(val_size//batch_size)) # SELD Metrics class
+    seld_metrics = SELDMetrics(model       = salsa_lite_model,
+                               val_dataset = validation_dataset,
+                               epoch_count = epoch_count,
+                               n_classes   = n_classes,
+                               n_val_iter  = int(val_size//batch_size)) # SELD Metrics class
     
     seld_error, error_rate, f_score, le_cd, lr_cd = seld_metrics.calc_csv_metrics() # Get the SELD metrics
     train_stats.append([epoch_count + 1, seld_error, error_rate, f_score, le_cd, lr_cd]) # Store metrics history

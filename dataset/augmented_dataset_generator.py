@@ -214,7 +214,7 @@ def segment_concat_audio(concat_data_dir = "./data/Dataset_concatenated_tracks/"
         higher_level_dir : (filepath) Directory where all the segmented data will be stored (and seperated
                             by class subfolders)"""
 
-    class_types = ['Noise', 'Dog', 'Impact' , 'Speech']
+    class_types = ['Dog', 'Impact' , 'Speech', 'Noise']
     # Manual settings 
     frame_len = int(window_duration*fs) 
     hop_len = int(hop_duration*fs)   
@@ -269,6 +269,18 @@ def segment_concat_audio(concat_data_dir = "./data/Dataset_concatenated_tracks/"
                     final_fn = "{}_{}_{}.wav".format(ct.lower(), azimuth, idx+1)
                     final_fp = os.path.join(output_data_dir, final_fn)
                     sf.write(final_fp, frame_T, samplerate=fs)
+                
+                # We repeat this again in order to increase variability
+                if ct == 'Speech':
+                    n_frames = len(frames)
+                    for idx, frame in enumerate(tqdm(frames)):
+                        t_frame = frame.T # transpose back to (channels, n_timebins)
+                        t_frame = normalize_array(t_frame) # normalize each segmented audio input to simulate demo
+                        frame_T = t_frame.T # tranpose back to (n_timebins, channels) again
+                        final_fn = "{}_{}_{}.wav".format(ct.lower(), azimuth, idx+1+n_frames)
+                        final_fp = os.path.join(output_data_dir, final_fn)
+                        sf.write(final_fp, frame_T, samplerate=fs)
+                
     return higher_level_dir
 
 
