@@ -19,6 +19,31 @@ def local_scaling(x):
     
     return x_scaled
 
+def normalize_array(array):
+    """
+    Normalize the array, each row locally. Used after we segment the audio into segments to mimic the way
+    that we will normalize the audio input during demo conditions. Normalizing (instead of scaling) helps 
+    to preserve the relative distance between data points, which could be better representations of the data
+    for the machine to learn.
+    
+    Arguments
+    --------
+    array (np.ndarray) : In this case, consider this the signal we wish to normalize
+    
+    Returns
+    ------
+    array_normed (np.ndarray) : Normalized array
+    """
+    array_normed = []
+    for i in range(len(array)):
+        x = array[i]
+        x -= np.mean(x)
+        x /= np.max(np.abs(x))
+        array_normed.append(x)
+    array_normed = np.array(array_normed)
+    
+    return array_normed
+
 def extract_features(audio_data,
                      cfg = None,
                      data_config: str = './configs/salsa_lite_demo_3class.yml'
@@ -100,8 +125,11 @@ def extract_features(audio_data,
     The shape should be (4 , x) for (n_channels, time*fs)
     """
     log_specs = []
+    normalized_audio_data = normalize_array(audio_data) # we normalize the audio first
+    
     for imic in np.arange(n_mics):
-        audio_mic_data = local_scaling(audio_data[imic, :]) 
+        # audio_mic_data = local_scaling(audio_data[imic, :]) 
+        audio_mic_data = normalized_audio_data[imic, :]
         stft = librosa.stft(y=np.asfortranarray(audio_mic_data), 
                             n_fft=n_fft, 
                             hop_length=hop_length,
