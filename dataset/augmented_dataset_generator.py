@@ -18,7 +18,7 @@ import gc
 import yaml
 from sklearn import preprocessing
 
-def normalize_array_inplace(array):
+def normalize_array(array):
     """
     Normalize the array, each row locally. Used after we segment the audio into segments to mimic the way
     that we will normalize the audio input during demo conditions. Normalizing (instead of scaling) helps 
@@ -31,10 +31,17 @@ def normalize_array_inplace(array):
     
     Returns
     ------
-    None
+    array_normed (np.ndarray) : Normalized array
     """
-    for i in range(array.shape[0]):
-        array[i] = (array[i] - np.min(array[i])) / (np.max(array[i]) - np.min(array[i]))
+    array_normed = []
+    for i in range(len(array)):
+        x = array[i]
+        x -= np.mean(x)
+        x /= np.max(np.abs(x))
+        array_normed.append(x)
+    array_normed = np.array(array_normed)
+    
+    return array_normed
         
 
 def full_feature_with_norm(audio_dir,
@@ -248,7 +255,7 @@ def segment_concat_audio(concat_data_dir = "./data/Dataset_concatenated_tracks/"
                 for idx, frame in enumerate(tqdm(frames)):
                     
                     t_frame = frame.T # transpose back to (channels, n_timebins)
-                    normalize_array_inplace(t_frame) # normalize each segmented audio input to simulate demo
+                    t_frame = normalize_array(t_frame) # normalize each segmented audio input to simulate demo
                     
                     if add_wgn: # Add a variable amount of noise to each frame
                         signal_power = np.mean(np.abs(t_frame) ** 2)
@@ -367,6 +374,7 @@ if __name__ == "__main__":
     # Ensure that script working directory is same directory as the script
     abspath = os.path.abspath(__file__)
     dname = os.path.dirname(abspath)
+    os.system('cls')
     print("Changing directory to : ", dname)
     os.chdir(dname)
     gc.enable()
@@ -396,10 +404,11 @@ if __name__ == "__main__":
                                                add_wgn=True,
                                                snr_db=20) 
     else:
-        audio_upper_dir = './_audio/cleaned_data_{}s_{}s/'.format(ws, hs)
+        # Change as needed, this is where we store our segmented audio
+        audio_upper_dir = './_audio/add_random_wgn_no_silence_0.5s_0.25s/' 
 
     # Next, we extract the features for the segmented audio clips
-    feature_upper_dir = os.path.join('.' , '_features', 'features_{}s_{}s'.format(ws, hs))
+    feature_upper_dir = os.path.join('.' , '_features', 'features_{}s_{}s_no_silence'.format(ws, hs))
     
     if create_features:
         classes = ['dog', 'impact', 'speech', 'noise']
