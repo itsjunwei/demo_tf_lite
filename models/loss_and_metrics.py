@@ -51,7 +51,7 @@ def seld_loss(y_true, y_pred):
     
     sed_loss = binary_crossentropy(y_true=sed_gt,
                                    y_pred=sed_pred,
-                                   from_logits=False)
+                                   from_logits=True)
 
     doa_loss = masked_reg_loss_azimuth(event_frame_gt   = sed_gt,
                                        doa_frame_gt     = doa_gt,
@@ -215,6 +215,17 @@ def get_angular_distance(azimuth_difference):
         """
         return 180 - abs(azimuth_difference - 180)
 
+def apply_sigmoid(x):
+    """Sigmoid function to be applied to each element of the array
+
+    Inputs
+        x (np.ndarray) : Input array
+
+    Returns
+        x (np.ndarray) : Output array where the sigmoid function is applied"""
+
+    return 1 / (1 + np.exp(-x))
+
 class SELDMetrics(object):
     def __init__(self, 
                  model, 
@@ -264,7 +275,8 @@ class SELDMetrics(object):
 
             # Extract the SED values from the single array
             SED_pred = remove_batch_dim(np.array(predictions[:, :, :self.n_classes]))
-            SED_gt   = remove_batch_dim(np.array(y_val[:, :, :self.n_classes])) 
+            SED_gt   = remove_batch_dim(np.array(y_val[:, :, :self.n_classes]))
+            SED_pred = apply_sigmoid(SED_pred) 
             # If the probability exceeds the threshold --> considered active (set to 1, else 0)
             SED_pred = (SED_pred > self.sed_threshold).astype(int)
                          
@@ -359,7 +371,8 @@ class SELDMetrics(object):
                 
                 # Extract the SED values from the single array
                 SED_pred = remove_batch_dim(np.array(predictions[:, :, :self.n_classes]))
-                SED_gt   = remove_batch_dim(np.array(y_val[:, :, :self.n_classes])) 
+                SED_gt   = remove_batch_dim(np.array(y_val[:, :, :self.n_classes]))
+                SED_pred = apply_sigmoid(SED_pred)
                 # If the probability exceeds the threshold --> considered active (set to 1, else 0)
                 SED_pred = (SED_pred > self.sed_threshold).astype(int)
                             
@@ -447,4 +460,3 @@ class SELDMetrics(object):
         print("DOA Errors for Positive GT DOA : {:.2f} , Negative GT DOA : {:.2f}".format( sum(gt_postive_doa_err) / (len(gt_postive_doa_err) + eps), sum(gt_negative_doa_err) / (len(gt_negative_doa_err) + eps) ) ) 
         print("SELD Error : {:.4f} , ER : {:.4f} , F1 : {:.4f}, LE : {:.4f}, LR : {:.4f}".format(seld_error, error_rate, f_score, le_cd, lr_cd))
         return seld_error, error_rate, f_score, le_cd, lr_cd
-        

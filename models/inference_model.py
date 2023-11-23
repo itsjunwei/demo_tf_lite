@@ -353,7 +353,7 @@ def sed_fcn(x, n_classes=4):
     x = ReLU(name = 'sed_relu')(x)
     x = Dropout(0.2)(x)
     x = Dense(n_classes, name='event_frame_logits')(x)
-    x = Activation('sigmoid', name='sed_sigmoid_out')(x)
+    # x = Activation('sigmoid', name='sed_sigmoid_out')(x)
 
     # (batch_size, time_steps, n_classes)
     return x
@@ -468,7 +468,7 @@ def get_inference_model(input_shape,
     model = Model(inputs  = inputs,
                   outputs = single_array_output, 
                   name    = 'full_SALSALITE_model')
-    
+
     model.compile(optimizer    = tf.keras.optimizers.Adam(learning_rate = 3e-4),
                 loss         = [seld_loss],
                 metrics      = [seld_loss])
@@ -478,7 +478,7 @@ def get_inference_model(input_shape,
 if __name__ == "__main__":
     resnet_style = 'basic'
     n_classes = 4
-    input_shape = (95, 161, 7) # HWC format now
+    input_shape = (95, 81, 7) # HWC format now
     # Get the salsa-lite model
     salsa_lite_model = get_inference_model(input_shape    = input_shape, 
                                 resnet_style   = resnet_style, 

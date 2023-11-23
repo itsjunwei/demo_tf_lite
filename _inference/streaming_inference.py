@@ -113,7 +113,8 @@ try:
             
             # Process output of prediction
             sed_pred = remove_batch_dim(np.array(output_data[:, :, :n_classes]))
-            sed_pred = (sed_pred > 0.7).astype(int)  
+            sed_pred = apply_sigmoid(sed_pred)
+            sed_pred = (sed_pred > 0.5).astype(int)  
             azi_pred = convert_xy_to_azimuth(remove_batch_dim(np.array(output_data[:, : , n_classes:])))
             # frame_outputs = []
             for i in range(len(sed_pred)):

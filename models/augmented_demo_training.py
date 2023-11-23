@@ -177,11 +177,11 @@ salsa_lite_model.reset_states() # attempt to fix the stateful BIGRU
 class LR_schedule:
     def __init__(self, total_epochs):
         self.total_epochs = total_epochs
-        # self.initial_lr = 3e-4
-        # self.ending_lr = 1e-4
-        self.initial_lr = 2e-4
-        self.ending_lr = 5e-5
-    
+        self.initial_lr = 3e-4
+        self.ending_lr = 1e-4
+        # self.initial_lr = 2e-4
+        # self.ending_lr = 5e-5
+
     def scheduler(self, epoch, lr):
         """Learning rate schedule should be 3x10^-4 for the first 70% of epochs, and it should reduce to 
         10^-4 for the remaining 30% of epochs. The purpose of this is to help the model converge faster
@@ -189,7 +189,7 @@ class LR_schedule:
         The reduce learning rate is meant to help the model make smaller, more refined updates to its weights.
         A smaller learning rate towards the end of training can also lead to more stable training, as the
         updates to the weights become smaller."""
-        
+
         if epoch < int(0.7 * self.total_epochs):
             lr = self.initial_lr
             return lr
@@ -254,7 +254,7 @@ for epoch_count in range(total_epochs):
         best_performing_epoch_path = "../experiments/{}/seld_model/epoch_{}_seld_{:.3f}.h5".format(now, min_SELD_error_array[0], min_SELD_error_array[1])
         print("Best performing epoch : {}, SELD Error : {:.4f}\n".format(min_SELD_error_array[0], min_SELD_error_array[1]))
         salsa_lite_model.save_weights(best_performing_epoch_path, overwrite=True)
-    if ((epoch_count - min_SELD_error_array[0]) == 10): 
+    if ((epoch_count - min_SELD_error_array[0]) == 10):
         print("SELD Error not decreasing any further for 10 epochs. Stopping training now")
         break # Early stopping criterion
 
@@ -279,7 +279,8 @@ if is_inference:
         test_predictions = salsa_lite_model.predict(x_test, verbose = 0)
         SED_pred = remove_batch_dim(np.array(test_predictions[:, :, :n_classes]))
         SED_gt   = remove_batch_dim(np.array(y_test[:, :, :n_classes]))
-        SED_pred = (SED_pred > 0.3).astype(int)      
+        SED_pred = apply_sigmoid(SED_pred) 
+        SED_pred = (SED_pred > 0.3).astype(int)
         
         AZI_gt   = convert_xy_to_azimuth(remove_batch_dim(np.array(y_test[:, : , n_classes:])))
         AZI_pred = convert_xy_to_azimuth(remove_batch_dim(np.array(test_predictions[:, : , n_classes:])))
@@ -288,7 +289,7 @@ if is_inference:
             masked_azimuths = SED_pred[i] * AZI_pred[i]
             output = np.concatenate([SED_pred[i], SED_gt[i], masked_azimuths, AZI_gt[i]], axis=-1)
             csv_data.append(output.flatten())
-            
+
     df = pd.DataFrame(csv_data)
     inference_csv_filepath = '../experiments/{}/outputs/test_data.csv'.format(now)
     os.makedirs("../experiments/{}/outputs".format(now), exist_ok = True)

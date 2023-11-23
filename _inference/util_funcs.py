@@ -27,6 +27,17 @@ def local_scaling(x):
     
     return x_scaled
 
+def apply_sigmoid(x):
+    """Sigmoid function to be applied to each element of the array
+
+    Inputs
+        x (np.ndarray) : Input array
+
+    Returns
+        x (np.ndarray) : Output array where the sigmoid function is applied"""
+
+    return 1 / (1 + np.exp(-x))
+
 def remove_batch_dim(tens):
     """Remove the batch dimension from an input tensor or 3D array
     Assumes that the input is of shape (batch_size x frames_per_batch x n_classes)
