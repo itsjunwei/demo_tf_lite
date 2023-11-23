@@ -38,7 +38,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 resnet_style = 'bottleneck'
 n_classes = 4
 batch_size = 32 # fixed because the GRU layer cannot recognise new batch sizes (not sure why)
-dataset_split = [0.5, 0.25, 0.25]
+dataset_split = [0.6, 0.2, 0.2]
 total_epochs = 50 # For training
 
 
@@ -46,7 +46,7 @@ total_epochs = 50 # For training
 Dataset loading functions
 """
 # Load dataset
-demo_dataset_dir = "../dataset/training_datasets/demo_dataset_0.5s_0.25s_wgn20"
+demo_dataset_dir = "../dataset/training_datasets/demo_dataset_0.5s_0.25s_wgn_random_remove_silence"
 feature_data_fp  = os.path.join(demo_dataset_dir, 'demo_salsalite_features.npy')
 gt_label_fp      = os.path.join(demo_dataset_dir, 'demo_gt_labels.npy')
 print("Features taken from : {}, size : {:.2f} MB".format(feature_data_fp, os.path.getsize(feature_data_fp)/(1024*1024)))
@@ -62,18 +62,20 @@ print("Augmented labels taken from   : {}, size : {:.2f} MB".format(augmented_gt
 aug_dataset       = np.load(augmented_data_fp, allow_pickle=True)
 aug_labels        = np.load(augmented_gt_fp, allow_pickle=True)
 
-# Load original recorded dataset
-clean_dataset_dir = "../dataset/training_datasets/demo_dataset_0.5s_0.25s_NHWC_scaled"
-clean_feature_fp  = os.path.join(clean_dataset_dir, 'demo_salsalite_features.npy')
-clean_gt_fp       = os.path.join(clean_dataset_dir, 'demo_gt_labels.npy')
-print("No WGN features taken from : {}, size : {:.2f} MB".format(clean_feature_fp, os.path.getsize(clean_feature_fp)/(1024*1024)))
-print("No WGN labels taken from   : {}, size : {:.2f} MB".format(clean_gt_fp, os.path.getsize(clean_gt_fp)/(1024*1024)))
-clean_dataset = np.load(clean_feature_fp, allow_pickle=True)
-clean_labels  = np.load(clean_gt_fp, allow_pickle=True)
+# # Load original recorded dataset
+# clean_dataset_dir = "../dataset/training_datasets/demo_dataset_0.5s_0.25s_NHWC_scaled"
+# clean_feature_fp  = os.path.join(clean_dataset_dir, 'demo_salsalite_features.npy')
+# clean_gt_fp       = os.path.join(clean_dataset_dir, 'demo_gt_labels.npy')
+# print("No WGN features taken from : {}, size : {:.2f} MB".format(clean_feature_fp, os.path.getsize(clean_feature_fp)/(1024*1024)))
+# print("No WGN labels taken from   : {}, size : {:.2f} MB".format(clean_gt_fp, os.path.getsize(clean_gt_fp)/(1024*1024)))
+# clean_dataset = np.load(clean_feature_fp, allow_pickle=True)
+# clean_labels  = np.load(clean_gt_fp, allow_pickle=True)
 
 # Combine them
-combined_dataset = np.concatenate((feature_dataset, aug_dataset, clean_dataset), axis=0)
-combined_labels  = np.concatenate((gt_labels, aug_labels, clean_labels), axis=0)
+# combined_dataset = np.concatenate((feature_dataset, aug_dataset, clean_dataset), axis=0)
+# combined_labels  = np.concatenate((gt_labels, aug_labels, clean_labels), axis=0)
+combined_dataset = np.concatenate((feature_dataset, aug_dataset), axis=0)
+combined_labels  = np.concatenate((gt_labels, aug_labels), axis=0)
 dataset_size = len(combined_dataset)
 
 # Create dataset generator 

@@ -391,7 +391,7 @@ if __name__ == "__main__":
 
     # Data directories 
     # Where to store dataset
-    dataset_dir = "./training_datasets/demo_dataset_{}s_{}s_wgn_random_remove_silence/".format(ws,hs)
+    dataset_dir = "./training_datasets/demo_dataset_{}s_{}s_no_silence_no_wgn/".format(ws,hs)
     # Where we stored the original concatenated audio
     concat_audio_dir = r".\data\remove_silence"
     
@@ -401,14 +401,13 @@ if __name__ == "__main__":
                                                fs=fs,
                                                window_duration=ws,
                                                hop_duration=hs,
-                                               add_wgn=True,
-                                               snr_db=20) 
+                                               add_wgn=False) 
     else:
         # Change as needed, this is where we store our segmented audio
         audio_upper_dir = './_audio/add_random_wgn_no_silence_0.5s_0.25s/' 
 
     # Next, we extract the features for the segmented audio clips
-    feature_upper_dir = os.path.join('.' , '_features', 'features_{}s_{}s_no_silence'.format(ws, hs))
+    feature_upper_dir = os.path.join('.' , '_features', 'features_{}s_{}s_no_wgn'.format(ws, hs))
     
     if create_features:
         classes = ['dog', 'impact', 'speech', 'noise']
