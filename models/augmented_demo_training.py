@@ -179,10 +179,10 @@ salsa_lite_model.reset_states() # attempt to fix the stateful BIGRU
 class LR_schedule:
     def __init__(self, total_epochs):
         self.total_epochs = total_epochs
-        self.initial_lr = 3e-4
-        self.ending_lr = 1e-4
-        # self.initial_lr = 2e-4
-        # self.ending_lr = 5e-5
+        # self.initial_lr = 3e-4
+        # self.ending_lr = 1e-4
+        self.initial_lr = 2e-4
+        self.ending_lr = 5e-5
 
     def scheduler(self, epoch, lr):
         """Learning rate schedule should be 3x10^-4 for the first 70% of epochs, and it should reduce to 

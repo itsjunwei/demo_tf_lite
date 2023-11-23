@@ -259,7 +259,7 @@ def segment_concat_audio(concat_data_dir = "./data/Dataset_concatenated_tracks/"
                     
                     if add_wgn: # Add a variable amount of noise to each frame
                         signal_power = np.mean(np.abs(t_frame) ** 2)
-                        desired_SNR_dB = np.random.randint(5,25) # SNR_DB = [5, 25]
+                        desired_SNR_dB = np.random.randint(5,15) # SNR_DB = [5, 15]
                         noise_std_dev = np.sqrt(signal_power / (10 ** (desired_SNR_dB / 10)))
                         noise = np.random.normal(0, noise_std_dev, size=t_frame.shape)
                         t_frame += noise
