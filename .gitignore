@@ -3,6 +3,7 @@ saved_models/
 __pycache__/
 *.py[cod]
 *.csv
+*.wav
 *.h5
 
 
