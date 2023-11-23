@@ -34,7 +34,7 @@ tf.keras.backend.clear_session()
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 resnet_style = 'bottleneck'
 n_classes = 4
-active_classes = ['dog' , 'impact' , 'speech']
+active_classes = ['dog' , 'impact' , 'speech', 'noise']
 fs = 48000
 trained_model_filepath = "./saved_models/bottleneck_w0.5s_scaled_with_noise.h5"
 
@@ -116,29 +116,30 @@ try:
             sed_pred = apply_sigmoid(sed_pred)
             sed_pred = (sed_pred > 0.5).astype(int)  
             azi_pred = convert_xy_to_azimuth(remove_batch_dim(np.array(output_data[:, : , n_classes:])))
-            # frame_outputs = []
+            frame_outputs = []
             for i in range(len(sed_pred)):
                 final_azi_pred = sed_pred[i] * azi_pred[i]
                 if int(sed_pred[i][-1]) == 1:
                     final_azi_pred[-1] = 0
                 output = np.concatenate([sed_pred[i], final_azi_pred], axis=-1)
                 print(output)
-                # frame_outputs.append(output.flatten())
+                frame_outputs.append(output.flatten())
             
             # Anything beyond this point is just my formating for the output data for personal testing
             # replace as per demo requirements
-            # frame_outputs = np.array(frame_outputs)
-            # averaged_output = np.mean(frame_outputs, axis=0)
-            # any_class = 0
-            # out_string = ""
-            # for j in range(n_classes):
-            #     if averaged_output[j] > 0.2:
-            #         out_string += "{} : {}, ".format(active_classes[j], averaged_output[j+n_classes])
-            #         any_class += 1
-            # if any_class == 0:
-            #     print("No class present")
-            # else:
-            #     print(out_string)
+            frame_outputs = np.array(frame_outputs)
+            averaged_output = np.mean(frame_outputs, axis=0)
+            any_class = 0
+            out_string = ""
+            for j in range(3):
+                if averaged_output[j] > 0.2:
+                    out_string += "{} : {}, ".format(active_classes[j], averaged_output[j+n_classes])
+                    any_class += 1
+            if any_class == 0:
+                print("No class present")
+            else:
+                print("Class    |   Average Azimuth")
+                print(out_string)
                 
             # Clear the buffer
             audio_buffer = []
