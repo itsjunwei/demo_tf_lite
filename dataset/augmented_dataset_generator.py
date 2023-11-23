@@ -18,6 +18,25 @@ import gc
 import yaml
 from sklearn import preprocessing
 
+def normalize_array_inplace(array):
+    """
+    Normalize the array, each row locally. Used after we segment the audio into segments to mimic the way
+    that we will normalize the audio input during demo conditions. Normalizing (instead of scaling) helps 
+    to preserve the relative distance between data points, which could be better representations of the data
+    for the machine to learn.
+    
+    Arguments
+    --------
+    array (np.ndarray) : In this case, consider this the signal we wish to normalize
+    
+    Returns
+    ------
+    None
+    """
+    for i in range(array.shape[0]):
+        array[i] = (array[i] - np.min(array[i])) / (np.max(array[i]) - np.min(array[i]))
+        
+
 def full_feature_with_norm(audio_dir,
                            feature_dir,
                            cfg = None,
@@ -42,9 +61,6 @@ def full_feature_with_norm(audio_dir,
     Returns
     --------
     None 
-
-    To-do
-    ------
     """
     if cfg is None:
         # Load data config files
@@ -171,9 +187,9 @@ def full_feature_with_norm(audio_dir,
 
 
 def segment_concat_audio(concat_data_dir = "./data/Dataset_concatenated_tracks/",
-                         fs = 24000,
-                         window_duration = 0.2,
-                         hop_duration = 0.1,
+                         fs = 48000,
+                         window_duration = 0.5,
+                         hop_duration = 0.25,
                          add_wgn = False,
                          snr_db = None):
     """Convert the concatenated audio files into segmented audio segments. This is meant to be the step
@@ -204,9 +220,10 @@ def segment_concat_audio(concat_data_dir = "./data/Dataset_concatenated_tracks/"
         # cleaned, output data directory
         output_data_dir = './_audio/cleaned_data_{}s_{}s/{}'.format(window_duration, hop_duration, ct.lower())
         higher_level_dir = './_audio/cleaned_data_{}s_{}s/'.format(window_duration, hop_duration)
-        if add_wgn: 
-            higher_level_dir = higher_level_dir.replace("cleaned_data" , "add_random_wgn")
-            output_data_dir = output_data_dir.replace('cleaned_data' , 'add_random_wgn')
+        if add_wgn:
+            higher_level_dir = higher_level_dir.replace("cleaned_data" , "add_random_wgn_no_silence")
+            output_data_dir = output_data_dir.replace('cleaned_data' , 'add_random_wgn_no_silence')
+        
         # create dirs
         os.makedirs(output_data_dir, exist_ok=True)
         print("Storing {} audio in :  {}".format(ct, output_data_dir))
@@ -223,41 +240,35 @@ def segment_concat_audio(concat_data_dir = "./data/Dataset_concatenated_tracks/"
                 # load audio
                 audio , _ = librosa.load(fullfn, sr=fs, mono=False, dtype=np.float32)
                 
-                # if add_wgn:
-                #     signal_power = np.mean(np.abs(audio) ** 2)
-                #     if snr_db is None:
-                #         snr_db = 20
-                #     desired_SNR_dB = snr_db
-                #     # Calculate the standard deviation of the noise
-                #     noise_std_dev = np.sqrt(signal_power / (10 ** (desired_SNR_dB / 10)))
-                #     # Generate the noise
-                #     noise = np.random.normal(0, noise_std_dev, size=audio.shape)
-                #     audio += noise
-                
                 # Segment the audio input into overlapping frames
                 frames = librosa.util.frame(audio, frame_length=frame_len, hop_length=hop_len)
                 
                 # Transpose into (n_segments, timebins, channels)
                 frames = frames.T
                 for idx, frame in enumerate(tqdm(frames)):
+                    
+                    t_frame = frame.T # transpose back to (channels, n_timebins)
+                    normalize_array_inplace(t_frame) # normalize each segmented audio input to simulate demo
+                    
                     if add_wgn: # Add a variable amount of noise to each frame
-                        signal_power = np.mean(np.abs(frame) ** 2)
+                        signal_power = np.mean(np.abs(t_frame) ** 2)
                         desired_SNR_dB = np.random.randint(5,25) # SNR_DB = [5, 25]
                         noise_std_dev = np.sqrt(signal_power / (10 ** (desired_SNR_dB / 10)))
-                        noise = np.random.normal(0, noise_std_dev, size=frame.shape)
-                        frame += noise
+                        noise = np.random.normal(0, noise_std_dev, size=t_frame.shape)
+                        t_frame += noise
+                    
+                    frame_T = t_frame.T # tranpose back to (n_timebins, channels) again
+                    
                     final_fn = "{}_{}_{}.wav".format(ct.lower(), azimuth, idx+1)
                     final_fp = os.path.join(output_data_dir, final_fn)
-                    sf.write(final_fp, frame, samplerate=fs)
+                    sf.write(final_fp, frame_T, samplerate=fs)
     return higher_level_dir
 
 
 def load_file(filepath):
     """
-    Extract SALSA-Lite features and ground truth from h5 file
-    
-    The label rate of the model should be 5fps, we match that accordingly by only producing one label
-    per 200ms SALSA-Lite feature (200ms is hardcoded for now)
+    Extract SALSA-Lite features and ground truth from h5 file. This assumes that the ground truth is
+    explicitly written in the filename of each .h5 file.
 
     Input
     -----
@@ -265,8 +276,8 @@ def load_file(filepath):
 
     Returns
     -------
-    features    (np.ndarray)  : SALSA-Lite Features (7, n_frames_in , freq_bins)
-    frame_gt    (np.ndarray)  : Ground truth labels for the audio file, (n_frames_out, n_classes * 3)
+    features (np.ndarray) : SALSA-Lite Features (7, n_frames_in , freq_bins)
+    frame_gt (np.ndarray) : Ground truth labels for the audio file, (n_frames_out, n_classes * 3)
     """
     
     # Read the h5 file
@@ -324,8 +335,8 @@ def create_dataset(feature_path_dir,
     """Create dataset arrays to be stored in .npy format later
 
     Input:
-        feature_path_dir : filepath to where the features are stored in
-        for_cpu          : boolean. True if generating dataset for CPU usage in form of NHWC
+        feature_path_dir  : filepath to where the features are stored in
+        for_cpu (boolean) : True if generating dataset for CPU usage in form of NHWC
 
     Returns:
         data      : dataset of features 
@@ -336,13 +347,6 @@ def create_dataset(feature_path_dir,
     classes = ['dog', 'impact', 'speech', 'noise']
     for cls in classes:
         feature_dir = os.path.join(feature_path_dir, cls)
-        
-        # # Get the class-wise mean and std.dev to normalize features
-        # scaler_dir = os.path.join(feature_path_dir, 'scalers')
-        # scaler_filepath = os.path.join(scaler_dir, '{}_feature_scaler.h5'.format(cls))
-        # with h5py.File(scaler_filepath, 'r') as shf:
-        #     mean = shf['mean'][:]
-        #     std = shf['std'][:]
             
         # Loop through features, add to database
         print("Generating dataset for : ", feature_dir)
@@ -350,7 +354,7 @@ def create_dataset(feature_path_dir,
             if file.endswith('.h5'):
                 full_filepath = os.path.join(feature_dir, file)
                 salsa_features , gt_label = load_file(filepath=full_filepath)
-                # salsa_features[:4] = (salsa_features[:4]-mean)/std
+                
                 # Because for CPU, Tensorflow only operates on height (freq) , width (time) , channel shape
                 if for_cpu : salsa_features = np.transpose(salsa_features, [2,1,0])
                 data.append(salsa_features)
@@ -372,16 +376,21 @@ if __name__ == "__main__":
     # Window, Hop duration in seconds 
     ws = 0.5
     hs = 0.25
+    fs = 48000
     seperate_audio = True
     create_features = True
     generate_dataset = True
 
-    dataset_dir = "./training_datasets/demo_dataset_{}s_{}s_wgn_random/".format(ws,hs)
-    concat_audio_dir = ".\data\scaled_audio"
+    # Data directories 
+    # Where to store dataset
+    dataset_dir = "./training_datasets/demo_dataset_{}s_{}s_wgn_random_remove_silence/".format(ws,hs)
+    # Where we stored the original concatenated audio
+    concat_audio_dir = r".\data\remove_silence"
     
     # Segment the audio first 
     if seperate_audio: 
         audio_upper_dir = segment_concat_audio(concat_data_dir = concat_audio_dir,
+                                               fs=fs,
                                                window_duration=ws,
                                                hop_duration=hs,
                                                add_wgn=True,
@@ -390,7 +399,6 @@ if __name__ == "__main__":
         audio_upper_dir = './_audio/cleaned_data_{}s_{}s/'.format(ws, hs)
 
     # Next, we extract the features for the segmented audio clips
-
     feature_upper_dir = os.path.join('.' , '_features', 'features_{}s_{}s'.format(ws, hs))
     
     if create_features:
