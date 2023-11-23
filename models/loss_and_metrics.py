@@ -379,7 +379,7 @@ class SELDMetrics(object):
                 # Extract the DOA values (X,Y) and convert them into azimuth
                 azi_gt   = convert_xy_to_azimuth(remove_batch_dim(np.array(y_val[:, : , self.n_classes:])), n_classes = self.n_classes)
                 azi_pred = convert_xy_to_azimuth(remove_batch_dim(np.array(predictions[:, : , self.n_classes:])), n_classes = self.n_classes)
-
+                azi_pred[: , -1] = 0
                 for i in range(len(SED_pred)):
                     output = np.concatenate([SED_pred[i], SED_gt[i], azi_pred[i], azi_gt[i]],
                                             axis = -1)

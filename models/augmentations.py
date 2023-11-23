@@ -15,7 +15,7 @@ def display_spectrogram(spectrogram, ax=None):
     ax.set_ylabel('Mel-frequency')
     plt.show()
 
-def freq_mask(spec, F=2, num_masks=2, replace_with_zero=True):
+def freq_mask(spec, F=3, num_masks=1, replace_with_zero=True):
     """
     Apply a frequency mask to the spectrogram. Starting point of the mask is f0, while the max. width
     of the mask is defined by F. Seeing as how the log-power spectrogram is (1,41) bins and the NIPD
@@ -34,7 +34,7 @@ def freq_mask(spec, F=2, num_masks=2, replace_with_zero=True):
     num_mel_channels = cloned.shape[0]
     
     for i in range(0, num_masks):        
-        f = tf.random.uniform([], minval=0, maxval=F, dtype=tf.int32)
+        f = tf.random.uniform([], minval=1, maxval=F, dtype=tf.int32)
         f0 = tf.random.uniform([], minval=0, maxval=num_mel_channels - f, dtype=tf.int32)
 
         if num_mel_channels == f: 
