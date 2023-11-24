@@ -394,8 +394,8 @@ if __name__ == "__main__":
     
     # General Configs 
     # Window, Hop duration in seconds 
-    ws = 0.5
-    hs = 0.25
+    ws = 1
+    hs = 0.2
     fs = 48000
     seperate_audio = True
     create_features = True

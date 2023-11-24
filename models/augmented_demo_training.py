@@ -47,20 +47,22 @@ Dataset loading functions
 """
 # Load dataset
 demo_dataset_dir = "../dataset/training_datasets/demo_dataset_0.5s_0.25s_wgn_random_remove_silence"
-feature_data_fp  = os.path.join(demo_dataset_dir, 'demo_salsalite_features.npy')
-gt_label_fp      = os.path.join(demo_dataset_dir, 'demo_gt_labels.npy')
-print("Features taken from : {}, size : {:.2f} MB".format(feature_data_fp, os.path.getsize(feature_data_fp)/(1024*1024)))
-print("Labels taken from   : {}, size : {:.2f} MB".format(gt_label_fp, os.path.getsize(gt_label_fp)/(1024*1024)))
-feature_dataset  = np.load(feature_data_fp, allow_pickle=True)
-gt_labels        = np.load(gt_label_fp, allow_pickle=True)
+# feature_data_fp  = os.path.join(demo_dataset_dir, 'demo_salsalite_features.npy')
+# gt_label_fp      = os.path.join(demo_dataset_dir, 'demo_gt_labels.npy')
+# print("Features taken from : {}, size : {:.2f} MB".format(feature_data_fp, os.path.getsize(feature_data_fp)/(1024*1024)))
+# print("Labels taken from   : {}, size : {:.2f} MB".format(gt_label_fp, os.path.getsize(gt_label_fp)/(1024*1024)))
+# feature_dataset  = np.load(feature_data_fp, allow_pickle=True)
+# gt_labels        = np.load(gt_label_fp, allow_pickle=True)
 
 # Load augmented dataset
 augmented_data_fp = os.path.join(demo_dataset_dir, 'augmented_salsalite_features.npy')
 augmented_gt_fp   = os.path.join(demo_dataset_dir, 'augmented_salsalite_labels.npy')
 print("Augmented features taken from : {}, size : {:.2f} MB".format(augmented_data_fp, os.path.getsize(augmented_data_fp)/(1024*1024)))
 print("Augmented labels taken from   : {}, size : {:.2f} MB".format(augmented_gt_fp, os.path.getsize(augmented_gt_fp)/(1024*1024)))
-aug_dataset       = np.load(augmented_data_fp, allow_pickle=True)
-aug_labels        = np.load(augmented_gt_fp, allow_pickle=True)
+# aug_dataset       = np.load(augmented_data_fp, allow_pickle=True)
+# aug_labels        = np.load(augmented_gt_fp, allow_pickle=True)
+combined_dataset = np.load(augmented_data_fp, allow_pickle=True)
+combined_labels  = np.load(augmented_gt_fp, allow_pickle=True)
 
 # # Load original recorded dataset
 # clean_dataset_dir = "../dataset/training_datasets/demo_dataset_0.5s_0.25s_NHWC_scaled"
@@ -74,8 +76,10 @@ aug_labels        = np.load(augmented_gt_fp, allow_pickle=True)
 # Combine them
 # combined_dataset = np.concatenate((feature_dataset, aug_dataset, clean_dataset), axis=0)
 # combined_labels  = np.concatenate((gt_labels, aug_labels, clean_labels), axis=0)
-combined_dataset = np.concatenate((feature_dataset, aug_dataset), axis=0)
-combined_labels  = np.concatenate((gt_labels, aug_labels), axis=0)
+
+# combined_dataset = np.concatenate((feature_dataset, aug_dataset), axis=0)
+# combined_labels  = np.concatenate((gt_labels, aug_labels), axis=0)
+
 dataset_size = len(combined_dataset)
 
 # Create dataset generator 
@@ -121,7 +125,7 @@ val_size     = int(dataset_split[1] * dataset_size)
 test_size    = int(dataset_split[2] * dataset_size)
 
 # Now we begin the split
-shuffled_dataset = dataset.cache().shuffle(dataset_size) # Shuffle first
+shuffled_dataset = dataset.shuffle(dataset_size) # Shuffle first
 non_training_dataset = shuffled_dataset.skip(train_size) # Validation and Testing splits, non-augmented
 validation_dataset = non_training_dataset.take(val_size).batch(batch_size = batch_size,
                                                                drop_remainder = True)
@@ -130,8 +134,9 @@ test_dataset       = non_training_dataset.skip(val_size).batch(batch_size = batc
 
 # Take the remaining data for training
 training_dataset = shuffled_dataset.take(train_size)
+# train_dataset = training_dataset.batch(batch_size=batch_size, drop_remainder=True)
 # Shuffle again, every epoch so different sets of data get augmented
-training_dataset = training_dataset.shuffle(train_size, reshuffle_each_iteration=True)
+training_dataset = training_dataset.cache().shuffle(train_size, reshuffle_each_iteration=True)
 non_augmented_dataset = training_dataset.take(train_size) # Clean training data
 
 augment_size = int(train_size/2) # Half of the data goes to each augmentation
@@ -179,10 +184,10 @@ salsa_lite_model.reset_states() # attempt to fix the stateful BIGRU
 class LR_schedule:
     def __init__(self, total_epochs):
         self.total_epochs = total_epochs
-        # self.initial_lr = 3e-4
-        # self.ending_lr = 1e-4
-        self.initial_lr = 2e-4
-        self.ending_lr = 5e-5
+        self.initial_lr = 3e-4
+        self.ending_lr = 1e-4
+        # self.initial_lr = 2e-4
+        # self.ending_lr = 5e-5
 
     def scheduler(self, epoch, lr):
         """Learning rate schedule should be 3x10^-4 for the first 70% of epochs, and it should reduce to 
