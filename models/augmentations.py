@@ -11,6 +11,7 @@ def display_spectrogram(spectrogram, ax=None):
     # and you want to display the first channel
     channel = 4
     ax.imshow(spectrogram[:, :, channel])
+    plt.colorbar(plt.imshow(spectrogram[:, :, channel]))
     ax.set_xlabel('Time')
     ax.set_ylabel('Mel-frequency')
     plt.show()
@@ -50,7 +51,7 @@ def freq_mask(spec, F=3, num_masks=1, replace_with_zero=True):
                 cloned = cloned * mask + tf.math.reduce_mean(cloned, axis=0) * (1-mask)
     return cloned
 
-def random_shift_updown(spec):
+def random_shift_updown(spec, shift_percent = 0.08):
     """
     Randomly shift a set of frequency bins up or down. Hard set the maximum frequency range to be 8% 
     of total frequency bins. After shifting the frequency bins up/down, they will be reflected to fill
@@ -58,7 +59,7 @@ def random_shift_updown(spec):
     """
     
     n_mel, n_time, n_channels = spec.shape
-    freq_shift_range = int(n_mel * 0.08)
+    freq_shift_range = int(n_mel * shift_percent)
     shift_len = np.random.randint(1, freq_shift_range, 1)[0]
     direction = np.random.choice(['up', 'down'], 1)[0]
 
@@ -98,4 +99,5 @@ if __name__ == "__main__":
     spectrogram = tf.tile(mel_values, [1, n_time, n_channels])  # shape becomes (n_mel, n_time, n_channels)
     
     display_spectrogram(spectrogram)
-    display_spectrogram(random_shift_updown(spectrogram))
+    display_spectrogram(freq_mask(spectrogram, F=15))
+    display_spectrogram(random_shift_updown(spectrogram, shift_percent=0.3))

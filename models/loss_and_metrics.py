@@ -59,7 +59,7 @@ def seld_loss(y_true, y_pred):
                                        n_classes        = n_classes)
     
     # hardcoded for now
-    weights = [0.3, 0.7]
+    weights = [0.5, 0.5]
     loss = weights[0] * sed_loss + weights[1] * doa_loss
     
     return loss
@@ -430,6 +430,7 @@ class SELDMetrics(object):
             sed_FN  += loc_FN.sum()
             tp_sed = np.logical_and(sed_p == 1 , sed_g == 1) # e.g. [True, False , True etc]
             sed_TP += tp_sed.sum()
+            tp_sed = tp_sed[ :len(tp_sed)-1]
             for class_idx, is_sed in enumerate(tp_sed):
                 if is_sed: # correct SED prediction
                     doa_diff = doa[idx][class_idx] - doa[idx][class_idx + self.n_classes] # DOA difference
