@@ -286,6 +286,7 @@ if is_inference:
         
         AZI_gt   = convert_xy_to_azimuth(remove_batch_dim(np.array(y_test[:, : , n_classes:])))
         AZI_pred = convert_xy_to_azimuth(remove_batch_dim(np.array(test_predictions[:, : , n_classes:])))
+        AZI_pred[: , -1] = 0
 
         for i in range(len(SED_pred)):
             masked_azimuths = SED_pred[i] * AZI_pred[i]
