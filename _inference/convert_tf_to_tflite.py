@@ -12,7 +12,7 @@ os.makedirs('./tflite_models', exist_ok=True)
 
 # Hard coded settings
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
-window_duration_s = 0.5
+window_duration_s = 1
 feature_len = int(window_duration_s * 10 * 16 + 1) # General FFT formula
 resnet_style = 'bottleneck'
 n_classes = 4

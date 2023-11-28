@@ -37,8 +37,8 @@ def normalize_array(array):
     array_normed = []
     for i in range(len(array)):
         x = array[i]
-        x -= np.mean(x)
-        x /= np.max(np.abs(x))
+        x = x - np.mean(x)
+        x = x / np.max(np.abs(x))
         array_normed.append(x)
     array_normed = np.array(array_normed)
     
@@ -126,10 +126,10 @@ def extract_features(audio_data,
     """
     log_specs = []
     normalized_audio_data = normalize_array(audio_data) # we normalize the audio first
-    
     for imic in np.arange(n_mics):
         # audio_mic_data = local_scaling(audio_data[imic, :]) 
         audio_mic_data = normalized_audio_data[imic, :]
+        # audio_mic_data = audio_data[imic]
         stft = librosa.stft(y=np.asfortranarray(audio_mic_data), 
                             n_fft=n_fft, 
                             hop_length=hop_length,

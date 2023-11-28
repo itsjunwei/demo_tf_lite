@@ -59,7 +59,7 @@ def seld_loss(y_true, y_pred):
                                        n_classes        = n_classes)
     
     # hardcoded for now
-    weights = [0.5, 0.5]
+    weights = [0.3, 0.7]
     loss = weights[0] * sed_loss + weights[1] * doa_loss
     
     return loss

@@ -39,7 +39,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 resnet_style = 'bottleneck'
 n_classes = 4
 fs = 48000
-trained_model_filepath = "./saved_models/seld_model_241123.h5"
+trained_model_filepath = "./saved_models/seld_model_271123.h5"
 
 """
 Dataset loading functions
@@ -122,7 +122,8 @@ salsa_lite_model.load_weights(trained_model_filepath)
 
 """Tensorflow predicting re-re-recorded audio data"""
 # new_recorded_audio_dir = os.path.join('_test_audio', 'ambisonics_combined')
-new_recorded_audio_dir = os.path.join('_test_audio', 'untrained')
+# new_recorded_audio_dir = os.path.join('_test_audio', 'untrained')
+new_recorded_audio_dir = './hybrid'
 for new_audio in os.listdir(new_recorded_audio_dir):
     if new_audio.endswith('.wav'):
         print(new_audio)
@@ -147,7 +148,7 @@ for new_audio in os.listdir(new_recorded_audio_dir):
                                                    verbose=0)
             
             sed_pred = remove_batch_dim(np.array(output_data[:, :, :n_classes]))
-            sed_pred = (sed_pred > 0.5).astype(int)  
+            sed_pred = (sed_pred > 0.3).astype(int)  
             azi_pred = convert_xy_to_azimuth(remove_batch_dim(np.array(output_data[:, : , n_classes:])))
             azi_pred[: , -1] = 0
             for i in range(len(sed_pred)):

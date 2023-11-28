@@ -47,6 +47,7 @@ Dataset loading functions
 """
 # Load dataset
 demo_dataset_dir = "../dataset/training_datasets/demo_dataset_0.5s_0.25s_add_random_wgn_remove_silence_twice"
+# demo_dataset_dir = "../dataset/training_datasets/demo_dataset_1s_0.2s_add_random_wgn_remove_silence"
 # feature_data_fp  = os.path.join(demo_dataset_dir, 'demo_salsalite_features.npy')
 # gt_label_fp      = os.path.join(demo_dataset_dir, 'demo_gt_labels.npy')
 # print("Features taken from : {}, size : {:.2f} MB".format(feature_data_fp, os.path.getsize(feature_data_fp)/(1024*1024)))
@@ -64,6 +65,10 @@ print("Augmented labels taken from   : {}, size : {:.2f} MB".format(augmented_gt
 combined_dataset = np.load(augmented_data_fp, allow_pickle=True)
 combined_labels  = np.load(augmented_gt_fp, allow_pickle=True)
 
+# Load ambience dataset
+ambience_data   = np.load('../dataset/training_datasets/ambience_0.5s_0.25s/noise_features.npy', allow_pickle=True)
+ambience_labels = np.load('../dataset/training_datasets/ambience_0.5s_0.25s/noise_labels.npy', allow_pickle=True)
+
 # # Load original recorded dataset
 # clean_dataset_dir = "../dataset/training_datasets/demo_dataset_0.5s_0.25s_NHWC_scaled"
 # clean_feature_fp  = os.path.join(clean_dataset_dir, 'demo_salsalite_features.npy')
@@ -80,6 +85,8 @@ combined_labels  = np.load(augmented_gt_fp, allow_pickle=True)
 # combined_dataset = np.concatenate((feature_dataset, aug_dataset), axis=0)
 # combined_labels  = np.concatenate((gt_labels, aug_labels), axis=0)
 
+combined_dataset = np.concatenate((combined_dataset, ambience_data), axis=0)
+combined_labels = np.concatenate((combined_labels, ambience_labels), axis=0)
 dataset_size = len(combined_dataset)
 
 # Create dataset generator 
