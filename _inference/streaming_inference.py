@@ -36,7 +36,7 @@ resnet_style = 'bottleneck'
 n_classes = 4
 active_classes = ['dog' , 'impact' , 'speech', 'noise']
 fs = 48000
-trained_model_filepath = "./saved_models/bottleneck_w0.5s_scaled_with_noise.h5"
+trained_model_filepath = "./saved_models/seld_model_271123.h5"
 
 """Create the salsa-lite model class to load the weights into"""
 # For JW testing
@@ -53,7 +53,7 @@ salsa_lite_model = get_model(input_shape    = input_shape,
                              batch_size     = 1)
 
 """Load the tflite model"""
-with open('./tflite_models/wgn20_freqmask_3_randshift/tflite_model.tflite', 'rb') as fid:
+with open('./tflite_models/seld_model_271123/tflite_model.tflite', 'rb') as fid:
     tflite_model = fid.read()
 
 interpreter = tf.lite.Interpreter(model_content=tflite_model)
@@ -93,7 +93,9 @@ try:
         audio_chunk = stream.read(chunk_size)
 
         # Convert the audio chunk into a NumPy array
-        audio_data = np.frombuffer(audio_chunk, dtype=np.int16).reshape(channels, -1)
+        audio_data = np.frombuffer(audio_chunk, dtype=np.int16)
+        audio_data = audio_data = audio_data.astype(np.float32) / 32760.0
+        audio_data = audio_data.reshape(channels, -1)
 
         # Append the chunk to the buffer
         audio_buffer.append(audio_data)
@@ -114,7 +116,7 @@ try:
             # Process output of prediction
             sed_pred = remove_batch_dim(np.array(output_data[:, :, :n_classes]))
             sed_pred = apply_sigmoid(sed_pred)
-            sed_pred = (sed_pred > 0.5).astype(int)  
+            sed_pred = (sed_pred > 0.3).astype(int)  
             azi_pred = convert_xy_to_azimuth(remove_batch_dim(np.array(output_data[:, : , n_classes:])))
             frame_outputs = []
             for i in range(len(sed_pred)):
@@ -122,7 +124,7 @@ try:
                 if int(sed_pred[i][-1]) == 1:
                     final_azi_pred[-1] = 0
                 output = np.concatenate([sed_pred[i], final_azi_pred], axis=-1)
-                print(output)
+                # print(output)
                 frame_outputs.append(output.flatten())
             
             # Anything beyond this point is just my formating for the output data for personal testing

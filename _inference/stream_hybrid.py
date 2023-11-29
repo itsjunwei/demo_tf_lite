@@ -34,7 +34,7 @@ fs = 48000
 n_classes = 4
 
 # Function to record audio and save it to the specified folder
-def record_and_save_audio(audio_folder, duration=1):
+def record_and_save_audio(audio_folder, duration=0.5):
     audio = pyaudio.PyAudio()
     stream = audio.open(
         format=pyaudio.paInt16,
@@ -50,7 +50,10 @@ def record_and_save_audio(audio_folder, duration=1):
         while True:
             # Read a chunk of audio data from the stream
             audio_chunk = stream.read(int(fs * duration))
-            audio_data = np.frombuffer(audio_chunk, dtype=np.int16).reshape(channels, -1)
+            audio_data = np.frombuffer(audio_chunk, dtype=np.int16)
+            audio_data = audio_data.astype(np.float32) / 32760.0
+            audio_data = audio_data.reshape(channels, -1)
+
             # Save the audio data to a WAV file using soundfile.write
             timestamp = time.strftime("%Y%m%d_%H%M%S")
             audio_filename = os.path.join(audio_folder, f"recording_{timestamp}.wav")
@@ -90,7 +93,7 @@ def process_existing_files(audio_folder, stop_processing):
 
 
                 """Load the tflite model"""
-                with open('./tflite_models/seld_model_1s_input/tflite_model.tflite', 'rb') as fid:
+                with open('./tflite_models/seld_model_271123/tflite_model.tflite', 'rb') as fid:
                     tflite_model = fid.read()
 
                 interpreter = tf.lite.Interpreter(model_content=tflite_model)
@@ -120,6 +123,8 @@ def process_existing_files(audio_folder, stop_processing):
                     
                 for idx, val  in enumerate(frame_outputs):
                     print(idx, val)
+                
+                os.remove(audio_path)
                     
                 
 
@@ -132,7 +137,7 @@ def process_existing_files(audio_folder, stop_processing):
 # ... (rest of your code)
 
 # Set the path to the folder containing audio files
-audio_folder = "./hybrid"
+audio_folder = "./hybrid_jwtest"
 os.makedirs(audio_folder, exist_ok=True)
 
 # Create a flag to signal the processing thread to stop

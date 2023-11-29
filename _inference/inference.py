@@ -39,7 +39,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 resnet_style = 'bottleneck'
 n_classes = 4
 fs = 48000
-trained_model_filepath = "./saved_models/seld_model_271123.h5"
+trained_model_filepath = "./saved_models/seld_model_1s_input.h5"
 
 """
 Dataset loading functions
@@ -72,7 +72,7 @@ Dataset loading functions
 # testing_dataset = dataset.shuffle(buffer_size=1000, seed=2023).take(1000).batch(batch_size = 1)
 
 # For JW testing
-window_duration_s = 0.5
+window_duration_s = 1
 feature_len = int(window_duration_s * 10 * 16 + 1) # General FFT formula
 
 input_shape = (95, feature_len, 7) # Height, Width , Channels shape
@@ -124,6 +124,7 @@ salsa_lite_model.load_weights(trained_model_filepath)
 # new_recorded_audio_dir = os.path.join('_test_audio', 'ambisonics_combined')
 # new_recorded_audio_dir = os.path.join('_test_audio', 'untrained')
 new_recorded_audio_dir = './hybrid'
+full_data = []
 for new_audio in os.listdir(new_recorded_audio_dir):
     if new_audio.endswith('.wav'):
         print(new_audio)
@@ -135,7 +136,7 @@ for new_audio in os.listdir(new_recorded_audio_dir):
                                     hop_length=int(window_duration_s * fs))
         frames = frames.T
 
-        tf_data = []
+
         for frame in frames:
             four_channel = frame.T
             feature = extract_features(four_channel)
@@ -154,11 +155,11 @@ for new_audio in os.listdir(new_recorded_audio_dir):
             for i in range(len(sed_pred)):
                 final_azi_pred = sed_pred[i] * azi_pred[i]
                 output = np.concatenate([sed_pred[i], final_azi_pred], axis=-1)
-                tf_data.append(output.flatten())
+                full_data.append(output.flatten())
 
-        df = pd.DataFrame(tf_data)
-        os.makedirs("./csv_outputs", exist_ok=True)
-        df.to_csv("./csv_outputs/test_{}".format(new_audio.replace('.wav', '.csv')), index=False, header=False)
+df = pd.DataFrame(full_data)
+os.makedirs("./csv_outputs", exist_ok=True)
+df.to_csv("./csv_outputs/test_{}.csv".format(now), index=False, header=False)
 
 
 
