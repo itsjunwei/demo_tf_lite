@@ -70,7 +70,7 @@ def convert_xy_to_azimuth(array,
     x_coords = array[: , :n_classes]
     y_coords = array[: , n_classes:]
     azimuths = np.around(np.arctan2(y_coords, x_coords) * 180.0 / np.pi)
-    azimuths[azimuths == 180] = -180
+    azimuths[azimuths < 0] += 360
     
     return azimuths
   
